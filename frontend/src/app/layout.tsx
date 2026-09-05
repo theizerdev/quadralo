@@ -4,6 +4,7 @@ import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import { Toaster } from "@/components/ui/sonner";
 import { PwaInstaller } from "@/components/pwa-installer";
+import { WhatsAppButton } from "@/components/whatsapp-button";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -70,6 +71,7 @@ export default function RootLayout({
           {children}
           <Toaster />
           <PwaInstaller />
+          <WhatsAppButton />
         </AuthProvider>
       </body>
     </html>
