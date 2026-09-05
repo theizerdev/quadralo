@@ -1,0 +1,58 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Modern Dark Squircle Background -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0B132B" />
+      <stop offset="100%" stop-color="#070B19" />
+    </linearGradient>
+
+    <!-- Top Face Gradient (Bright Mint) -->
+    <linearGradient id="topFace" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#34D399" />
+      <stop offset="100%" stop-color="#10B981" />
+    </linearGradient>
+
+    <!-- Left Face Gradient (Vibrant Emerald) -->
+    <linearGradient id="leftFace" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#10B981" />
+      <stop offset="100%" stop-color="#059669" />
+    </linearGradient>
+
+    <!-- Right Face Gradient (Deep Rich Emerald) -->
+    <linearGradient id="rightFace" x1="100%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#059669" />
+      <stop offset="100%" stop-color="#047857" />
+    </linearGradient>
+
+    <!-- Subtle Glow Filter -->
+    <filter id="glow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#10B981" flood-opacity="0.35" />
+    </filter>
+  </defs>
+
+  <!-- Squircle Base -->
+  <rect width="64" height="64" rx="16" fill="url(#bgGrad)" stroke="#10B981" stroke-width="1" stroke-opacity="0.2" />
+
+  <!-- Isometric Precision Cube -->
+  <g filter="url(#glow)" transform="translate(32, 32)">
+    <!-- Top Face Outer -->
+    <path d="M0 -21 L18 -11 L0 -1 L-18 -11 Z" fill="url(#topFace)" />
+    <!-- Top Face Inner Cutout -->
+    <path d="M0 -15 L10 -9.5 L0 -4 L-10 -9.5 Z" fill="#070B19" fill-opacity="0.9" />
+
+    <!-- Left Face Outer -->
+    <path d="M-18 -11 L0 -1 L0 19 L-18 9 Z" fill="url(#leftFace)" />
+    <!-- Left Face Inner Ribbon -->
+    <path d="M-13 -7.5 L-5 -3 L-5 13 L-13 8.5 Z" fill="#070B19" fill-opacity="0.8" />
+    <path d="M-9 -5 L-5 -3 L-5 9 L-9 7 Z" fill="url(#topFace)" opacity="0.9" />
+
+    <!-- Right Face Outer -->
+    <path d="M0 -1 L18 -11 L18 9 L0 19 Z" fill="url(#rightFace)" />
+    <!-- Right Face Inner Ribbon -->
+    <path d="M5 -3 L13 -7.5 L13 8.5 L5 13 Z" fill="#070B19" fill-opacity="0.8" />
+    <path d="M5 -3 L9 -5 L9 7 L5 9 Z" fill="url(#leftFace)" opacity="0.9" />
+
+    <!-- Center Balance Core -->
+    <path d="M0 -4 L7 0 L0 4 L-7 0 Z" fill="#34D399" />
+  </g>
+</svg>
