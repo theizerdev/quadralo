@@ -54,6 +54,8 @@ wheels/
 *.sqlite3
 adatov.db
 backend/adatov.db
+quadralo.db
+backend/quadralo.db
 
 # ------------------------------------------
 # Next.js & Frontend Build Outputs
