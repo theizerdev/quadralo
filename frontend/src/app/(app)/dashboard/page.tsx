@@ -145,6 +145,7 @@ export default function DashboardPage() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [customRangeActive, setCustomRangeActive] = useState(false);
+  const [chartMode, setChartMode] = useState<"grouped" | "stacked" | "line">("grouped");
 
   // Estados de datos
   const [analytics, setAnalytics] = useState<SalesAnalyticsResponse | null>(null);
@@ -226,63 +227,114 @@ export default function DashboardPage() {
     return { label: "Margen Reducido", color: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20" };
   };
 
-  // 1. Gráfico Principal Mixto: Ventas, Costos y Ganancia
+  // 1. Gráfico Principal: Evolución de Ventas, Costos y Ganancia Neta
   const timelineSeries = useMemo(() => {
-    if (!analytics?.timeline) return [];
+    if (!analytics?.timeline || analytics.timeline.length === 0) return [];
+
+    if (chartMode === "stacked") {
+      // Modo Composición: Costo + Ganancia apilados suman el 100% de la venta
+      return [
+        {
+          name: "Costo Mercancía (COGS)",
+          data: analytics.timeline.map((p) =>
+            Number((currency === "USD" ? p.cost_usd : p.cost_ves).toFixed(2))
+          ),
+        },
+        {
+          name: "Ganancia Neta",
+          data: analytics.timeline.map((p) =>
+            Number((currency === "USD" ? p.profit_usd : p.profit_ves).toFixed(2))
+          ),
+        },
+      ];
+    }
+
+    if (chartMode === "line") {
+      // Modo Líneas de Tendencia
+      return [
+        {
+          name: "Ventas Totales",
+          data: analytics.timeline.map((p) =>
+            Number((currency === "USD" ? p.revenue_usd : p.revenue_ves).toFixed(2))
+          ),
+        },
+        {
+          name: "Costo Mercancía (COGS)",
+          data: analytics.timeline.map((p) =>
+            Number((currency === "USD" ? p.cost_usd : p.cost_ves).toFixed(2))
+          ),
+        },
+        {
+          name: "Ganancia Neta",
+          data: analytics.timeline.map((p) =>
+            Number((currency === "USD" ? p.profit_usd : p.profit_ves).toFixed(2))
+          ),
+        },
+      ];
+    }
+
+    // Modo por Defecto: "grouped" (Barras Comparativas Lado a Lado)
     return [
       {
         name: "Ventas Totales",
-        type: "line",
         data: analytics.timeline.map((p) =>
           Number((currency === "USD" ? p.revenue_usd : p.revenue_ves).toFixed(2))
         ),
       },
       {
-        name: "Ganancia Neta",
-        type: "area",
-        data: analytics.timeline.map((p) =>
-          Number((currency === "USD" ? p.profit_usd : p.profit_ves).toFixed(2))
-        ),
-      },
-      {
         name: "Costo Mercancía (COGS)",
-        type: "column",
         data: analytics.timeline.map((p) =>
           Number((currency === "USD" ? p.cost_usd : p.cost_ves).toFixed(2))
         ),
       },
+      {
+        name: "Ganancia Neta",
+        data: analytics.timeline.map((p) =>
+          Number((currency === "USD" ? p.profit_usd : p.profit_ves).toFixed(2))
+        ),
+      },
     ];
-  }, [analytics, currency]);
+  }, [analytics, currency, chartMode]);
 
   const timelineOptions: ApexOptions = useMemo(() => {
     const categories = analytics?.timeline.map((p) => p.label) || [];
+    const isStacked = chartMode === "stacked";
+    const isLine = chartMode === "line";
+
+    const colors = isStacked
+      ? ["#94A3B8", "#10B981"] // Costo (Slate), Ganancia (Emerald)
+      : ["#6366F1", "#94A3B8", "#10B981"]; // Ventas (Indigo), Costo (Slate), Ganancia (Emerald)
+
     return {
       chart: {
-        type: "line",
+        type: isLine ? "line" : "bar",
+        stacked: isStacked,
         height: 330,
         toolbar: { show: false },
-        animations: { enabled: true, easing: "easeinout", speed: 450 },
+        animations: { enabled: true, easing: "easeinout", speed: 400 },
         fontFamily: "inherit",
       },
-      colors: ["#6366F1", "#10B981", "#CBD5E1"],
+      colors,
       stroke: {
+        show: true,
+        width: isLine ? 3 : isStacked ? 1 : 2,
         curve: "smooth",
-        width: [3, 2.5, 0],
-      },
-      fill: {
-        type: ["solid", "gradient", "solid"],
-        gradient: {
-          shadeIntensity: 1,
-          opacityFrom: 0.45,
-          opacityTo: 0.05,
-          stops: [0, 90, 100],
-        },
+        colors: isLine ? undefined : ["transparent"],
       },
       plotOptions: {
         bar: {
-          columnWidth: "35%",
+          horizontal: false,
+          columnWidth: categories.length === 1 ? "28%" : categories.length <= 4 ? "42%" : "58%",
           borderRadius: 4,
+          borderRadiusApplication: "end",
         },
+      },
+      dataLabels: {
+        enabled: false,
+      },
+      markers: {
+        size: isLine ? 5 : 0,
+        hover: { size: 7 },
       },
       xaxis: {
         categories,
@@ -311,18 +363,20 @@ export default function DashboardPage() {
         },
       },
       legend: {
+        show: true,
         position: "top",
         horizontalAlign: "right",
         fontSize: "12px",
-        fontWeight: 500,
+        fontWeight: 600,
         markers: { size: 6 },
+        itemMargin: { horizontal: 8, vertical: 2 },
       },
       grid: {
         borderColor: "rgba(148, 163, 184, 0.15)",
         strokeDashArray: 4,
       },
     };
-  }, [analytics, currency]);
+  }, [analytics, currency, chartMode]);
 
   // 2. Gráfico de Curva de Margen (%)
   const marginSeries = useMemo(() => {
@@ -838,27 +892,78 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Gráfico 1: Evolución Financiera Integral (2/3 cols) */}
         <div className="lg:col-span-2 rounded-2xl border border-neutral-200/80 bg-white p-5 shadow-2xs dark:border-neutral-800 dark:bg-neutral-900/70 flex flex-col justify-between">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2">
             <div>
               <h3 className="font-bold text-base text-neutral-900 dark:text-white flex items-center gap-2">
                 <BarChart3 className="size-4 text-emerald-500" />
                 <span>Evolución: Ventas, Costos y Ganancia Neta</span>
               </h3>
               <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                Comparativa temporal en tiempo real con datos agrupados por {granularity === "day" ? "día" : granularity === "week" ? "semana" : "mes"}.
+                Comparativa temporal de compras vs ventas con datos agrupados por {granularity === "day" ? "día" : granularity === "week" ? "semana" : "mes"}.
               </p>
             </div>
-            <div className="flex items-center gap-2 text-xs font-semibold">
-              <span className="flex items-center gap-1 text-indigo-600 dark:text-indigo-400">
-                <span className="size-2 rounded-full bg-indigo-500"></span> Ventas
-              </span>
-              <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
-                <span className="size-2 rounded-full bg-emerald-500"></span> Ganancia
-              </span>
-              <span className="flex items-center gap-1 text-neutral-400">
-                <span className="size-2 rounded-full bg-slate-400"></span> Costos
-              </span>
+
+            {/* Selector de Modo de Visualización */}
+            <div className="flex items-center gap-1 bg-neutral-100 dark:bg-neutral-800/80 p-1 rounded-xl text-xs font-semibold self-start sm:self-auto">
+              <button
+                type="button"
+                onClick={() => setChartMode("grouped")}
+                className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                  chartMode === "grouped"
+                    ? "bg-white dark:bg-neutral-700 text-neutral-900 dark:text-white shadow-xs font-bold"
+                    : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
+                }`}
+                title="Ver Ventas, Costos y Ganancias en columnas lado a lado"
+              >
+                📊 Barras
+              </button>
+              <button
+                type="button"
+                onClick={() => setChartMode("stacked")}
+                className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                  chartMode === "stacked"
+                    ? "bg-white dark:bg-neutral-700 text-neutral-900 dark:text-white shadow-xs font-bold"
+                    : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
+                }`}
+                title="Ver Costo + Ganancia apilados sumando el 100% de la venta"
+              >
+                🧱 Composición
+              </button>
+              <button
+                type="button"
+                onClick={() => setChartMode("line")}
+                className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                  chartMode === "line"
+                    ? "bg-white dark:bg-neutral-700 text-neutral-900 dark:text-white shadow-xs font-bold"
+                    : "text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
+                }`}
+                title="Ver líneas continuas de tendencia"
+              >
+                📈 Líneas
+              </button>
             </div>
+          </div>
+
+          {/* Pastillas de Resumen Financiero del Período */}
+          <div className="flex flex-wrap items-center gap-2 pb-2.5 mb-1 border-b border-neutral-100 dark:border-neutral-800/60 text-xs">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 font-medium">
+              <span className="size-2 rounded-full bg-indigo-500"></span>
+              <span>Ventas: <strong>{formatMoney(totalRevenue, totalRevenue * bcvRate)}</strong></span>
+            </span>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-neutral-800 text-slate-700 dark:text-slate-300 font-medium">
+              <span className="size-2 rounded-full bg-slate-400"></span>
+              <span>Costo COGS: <strong>{formatMoney(totalCogs, totalCogs * bcvRate)}</strong></span>
+            </span>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 font-medium">
+              <span className="size-2 rounded-full bg-emerald-500"></span>
+              <span>Ganancia Neta: <strong>{formatMoney(totalProfit, totalProfit * bcvRate)}</strong></span>
+              <span className="text-[10px] opacity-75 font-bold">({grossMargin.toFixed(1)}%)</span>
+            </span>
+            <span className="ml-auto text-[11px] text-neutral-400 hidden sm:inline">
+              {chartMode === "grouped" && "💡 Columnas lado a lado para comparar cada métrica"}
+              {chartMode === "stacked" && "💡 Costo + Ganancia suman la Venta Total"}
+              {chartMode === "line" && "💡 Curvas continuas de tendencia"}
+            </span>
           </div>
 
           <div className="w-full min-h-[330px]">
@@ -866,7 +971,7 @@ export default function DashboardPage() {
               <Chart
                 options={timelineOptions}
                 series={timelineSeries}
-                type="line"
+                type={chartMode === "line" ? "line" : "bar"}
                 height={330}
               />
             ) : (
