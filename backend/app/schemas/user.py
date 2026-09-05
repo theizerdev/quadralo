@@ -39,7 +39,18 @@ class ForgotPasswordRequest(BaseModel):
     email: EmailStr
 
 class ResetPasswordRequest(BaseModel):
-    token: str
+    token: Optional[str] = None
+    email: Optional[EmailStr] = None
+    code: Optional[str] = None
+    new_password: str
+
+class VerifyResetCodeRequest(BaseModel):
+    email: EmailStr
+    code: str
+
+class ResetPasswordWithCodeRequest(BaseModel):
+    email: EmailStr
+    code: str
     new_password: str
 
 class ChangePasswordRequest(BaseModel):
@@ -49,4 +60,5 @@ class ChangePasswordRequest(BaseModel):
 class MessageResponse(BaseModel):
     message: str
     success: bool = True
+    reset_code: Optional[str] = None
     reset_token: Optional[str] = None

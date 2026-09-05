@@ -18,4 +18,6 @@ class User(Base):
     role = Column(String(50), default="user", nullable=False)
     is_superuser = Column(Boolean, default=False, nullable=False)
     is_active = Column(Boolean, default=True)
+    reset_code = Column(String(8), nullable=True)
+    reset_code_expires_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
