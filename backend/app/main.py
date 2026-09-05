@@ -35,4 +35,4 @@ app.include_router(bcv.router, prefix=f"{settings.API_V1_STR}/bcv", tags=["bcv"]
 
 @app.get("/")
 def root():
-    return {"message": "Bienvenido a ADATOV SaaS API", "status": "online"}
+    return {"message": "Bienvenido a Quádralo API", "status": "online"}

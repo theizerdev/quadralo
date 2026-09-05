@@ -25,7 +25,7 @@ class Settings(BaseSettings):
         if self.DB_TYPE == "mysql":
             pwd = f":{self.DB_PASSWORD}" if self.DB_PASSWORD else ""
             return f"mysql+pymysql://{self.DB_USER}{pwd}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}?charset=utf8mb4"
-        return "sqlite:///./adatov.db"
+        return "sqlite:///./quadralo.db"
 
     class Config:
         env_file = ".env"

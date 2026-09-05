@@ -1,5 +1,5 @@
 """
-ADATOV Fullstack Runner
+Quádralo Fullstack Runner
 Ejecuta el Backend (FastAPI) y Frontend (Next.js) concurrentemente.
 """
 import subprocess
@@ -17,7 +17,7 @@ def main():
         python_exec = sys.executable
 
     print("\n" + "="*55)
-    print("      ADATOV - Servidor Fullstack Iniciado")
+    print("      QUÁDRALO - Servidor Fullstack Iniciado")
     print("="*55)
     print("  * Backend FastAPI:  http://127.0.0.1:8000")
     print("  * Frontend Next.js: http://localhost:3000")

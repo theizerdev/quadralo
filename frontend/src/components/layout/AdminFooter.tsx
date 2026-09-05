@@ -6,7 +6,7 @@ export function AdminFooter() {
     <footer className="mt-auto bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 py-4 px-6 text-xs text-slate-500 dark:text-slate-400">
       <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <span className="font-bold text-slate-700 dark:text-slate-300">ADATOV SaaS</span>
+          <span className="font-bold text-slate-700 dark:text-slate-300">Quádralo</span>
           <span>© 2026</span>
           <span className="hidden sm:inline">•</span>
           <span className="hidden sm:inline">Gestión Financiera Bimonetaria (USD / VES)</span>

@@ -34,7 +34,7 @@ def fetch_all_rates_from_apis() -> Dict[str, Any]:
     try:
         req_usd = urllib.request.Request(
             "https://ve.dolarapi.com/v1/dolares/oficial",
-            headers={"User-Agent": "ADATOV-App/1.0", "Accept": "application/json"}
+            headers={"User-Agent": "Quadralo-App/1.0", "Accept": "application/json"}
         )
         with urllib.request.urlopen(req_usd, context=ctx, timeout=5) as response:
             data = json.loads(response.read().decode("utf-8"))
@@ -52,7 +52,7 @@ def fetch_all_rates_from_apis() -> Dict[str, Any]:
     try:
         req_eur = urllib.request.Request(
             "https://ve.dolarapi.com/v1/euros/oficial",
-            headers={"User-Agent": "ADATOV-App/1.0", "Accept": "application/json"}
+            headers={"User-Agent": "Quadralo-App/1.0", "Accept": "application/json"}
         )
         with urllib.request.urlopen(req_eur, context=ctx, timeout=5) as response:
             data = json.loads(response.read().decode("utf-8"))

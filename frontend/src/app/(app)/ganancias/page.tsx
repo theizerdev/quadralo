@@ -235,7 +235,7 @@ export default function GananciasPage() {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `reporte_ganancias_adatov_${preset}.csv`);
+    link.setAttribute("download", `reporte_ganancias_quadralo_${preset}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

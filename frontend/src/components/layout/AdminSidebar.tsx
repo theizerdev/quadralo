@@ -82,7 +82,7 @@ export function AdminSidebar({ isOpen, onClose, businessName }: SidebarProps) {
             </div>
             <div>
               <span className="font-extrabold text-slate-900 dark:text-white text-base tracking-tight block">
-                ADATOV
+                Quádralo
               </span>
               <span className="text-[10px] text-blue-600 dark:text-blue-400 font-bold uppercase tracking-wider block">
                 SaaS Multiusuario
