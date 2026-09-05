@@ -9,8 +9,8 @@ def generate_uuid():
 class BCVRateSetting(Base):
     __tablename__ = "bcv_rates"
 
-    id = Column(String, primary_key=True, default=generate_uuid, index=True)
-    user_id = Column(String, ForeignKey("users.id"), nullable=True, index=True)
+    id = Column(String(36), primary_key=True, default=generate_uuid, index=True)
+    user_id = Column(String(36), ForeignKey("users.id"), nullable=True, index=True)
     rate = Column(Float, nullable=False)
-    source = Column(String, default="BCV Oficial")
+    source = Column(String(100), default="BCV Oficial")
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))

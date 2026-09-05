@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ADATOV - Gestión Financiera & Ventas (SaaS)",
-  description: "Control de Inversiones en VES, Tasa BCV, Márgenes de Ganancia y Ventas",
+  title: "Quádralo - Tus finanzas siempre al día",
+  description: "Plataforma de gestión de inversiones, ventas, márgenes de ganancia y tasa BCV para emprendedores",
 };
 
 export default function RootLayout({

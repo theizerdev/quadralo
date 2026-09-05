@@ -10,10 +10,10 @@ def generate_uuid():
 class Investment(Base):
     __tablename__ = "investments"
 
-    id = Column(String, primary_key=True, default=generate_uuid, index=True)
-    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    id = Column(String(36), primary_key=True, default=generate_uuid, index=True)
+    user_id = Column(String(36), ForeignKey("users.id"), nullable=False, index=True)
     
-    product_name = Column(String, nullable=False)
+    product_name = Column(String(255), nullable=False)
     amount_ves = Column(Float, nullable=False)          # Inversión en Bolívares
     bcv_rate = Column(Float, nullable=False)            # Tasa BCV usada en la compra
     amount_usd = Column(Float, nullable=False)          # Equivalente en USD (amount_ves / bcv_rate)

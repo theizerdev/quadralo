@@ -10,11 +10,11 @@ def generate_uuid():
 class Sale(Base):
     __tablename__ = "sales"
 
-    id = Column(String, primary_key=True, default=generate_uuid, index=True)
-    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
-    investment_id = Column(String, ForeignKey("investments.id"), nullable=True, index=True)
+    id = Column(String(36), primary_key=True, default=generate_uuid, index=True)
+    user_id = Column(String(36), ForeignKey("users.id"), nullable=False, index=True)
+    investment_id = Column(String(36), ForeignKey("investments.id"), nullable=True, index=True)
 
-    product_name = Column(String, nullable=False)
+    product_name = Column(String(255), nullable=False)
     quantity = Column(Integer, nullable=False, default=1)
     
     # Costos base
@@ -37,8 +37,8 @@ class Sale(Base):
     profit_margin_percent = Column(Float, nullable=False)           # (net_profit_usd / total_cost_usd) * 100
     
     # Metadatos de la transacción
-    payment_method = Column(String, nullable=False, default="Pago Móvil") # Pago Móvil, Efectivo USD, Zelle, Punto de Venta, Transferencia VES, Binance / USDT, Otro
-    customer_name = Column(String, nullable=True)
+    payment_method = Column(String(100), nullable=False, default="Pago Móvil")
+    customer_name = Column(String(255), nullable=True)
     notes = Column(Text, nullable=True)
 
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
