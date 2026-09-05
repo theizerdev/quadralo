@@ -11,19 +11,22 @@ import {
   Lock,
   ArrowRight,
   ArrowLeft,
-  Key,
+  Mail,
   Eye,
   EyeOff,
   CheckCircle2,
   AlertCircle,
   ShieldCheck,
+  KeyRound,
 } from "lucide-react";
 
 function ResetPasswordForm() {
   const searchParams = useSearchParams();
-  const tokenFromUrl = searchParams.get("token") || "";
+  const emailFromUrl = searchParams.get("email") || "";
+  const codeFromUrl = searchParams.get("code") || searchParams.get("token") || "";
 
-  const [token, setToken] = useState(tokenFromUrl);
+  const [email, setEmail] = useState(emailFromUrl);
+  const [code, setCode] = useState(codeFromUrl);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -32,22 +35,27 @@ function ResetPasswordForm() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (tokenFromUrl) {
-      setToken(tokenFromUrl);
-    }
-  }, [tokenFromUrl]);
+    if (emailFromUrl) setEmail(emailFromUrl);
+    if (codeFromUrl) setCode(codeFromUrl);
+  }, [emailFromUrl, codeFromUrl]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
-    if (!token.trim()) {
-      setError("El código o token de restablecimiento es requerido.");
+    const cleanCode = code.replace(/\D/g, "");
+    if (!email.trim()) {
+      setError("El correo electrónico es requerido.");
+      return;
+    }
+
+    if (cleanCode.length !== 8) {
+      setError("Por favor ingresa la clave completa de 8 dígitos numéricos.");
       return;
     }
 
     if (newPassword.length < 6) {
-      setError("La contraseña debe tener un mínimo de 6 caracteres.");
+      setError("La contraseña debe tener al menos 6 caracteres.");
       return;
     }
 
@@ -62,13 +70,14 @@ function ResetPasswordForm() {
       await apiFetch("/auth/reset-password", {
         method: "POST",
         body: JSON.stringify({
-          token: token.trim(),
+          email: email.trim().toLowerCase(),
+          code: cleanCode,
           new_password: newPassword,
         }),
       });
       setSuccess(true);
     } catch (err: any) {
-      setError(err.message || "Token inválido o expirado. Por favor solicita uno nuevo.");
+      setError(err.message || "Clave de 8 dígitos inválida o expirada. Por favor solicita una nueva.");
     } finally {
       setLoading(false);
     }
@@ -76,8 +85,8 @@ function ResetPasswordForm() {
 
   if (success) {
     return (
-      <div className="space-y-6 text-center animate-in fade-in duration-300">
-        <div className="size-16 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center justify-center mx-auto">
+      <div className="space-y-6 text-center animate-in fade-in duration-300 py-4">
+        <div className="size-16 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center justify-center mx-auto shadow-sm">
           <CheckCircle2 className="size-8" />
         </div>
 
@@ -85,17 +94,19 @@ function ResetPasswordForm() {
           <h2 className="text-2xl font-extrabold text-neutral-900 dark:text-white">
             ¡Contraseña Restablecida!
           </h2>
-          <p className="text-sm text-neutral-500 dark:text-neutral-400">
-            Tu nueva contraseña ha sido guardada de forma segura. Ya puedes ingresar a tu cuenta de Quádralo.
+          <p className="text-sm text-neutral-500 dark:text-neutral-400 max-w-sm mx-auto leading-relaxed">
+            Tu nueva clave de acceso ha sido actualizada de forma exitosa. Ya puedes ingresar a tu cuenta de Quádralo.
           </p>
         </div>
 
-        <Link href="/login" className="block w-full">
-          <Button className="w-full h-11 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-sm gap-2 shadow-md shadow-emerald-600/20">
-            <span>Iniciar Sesión Ahora</span>
-            <ArrowRight className="size-4" />
-          </Button>
-        </Link>
+        <div className="pt-2">
+          <Link href="/login" className="block w-full">
+            <Button className="w-full h-11 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-sm gap-2 shadow-md shadow-emerald-600/20 cursor-pointer">
+              <span>Iniciar Sesión Ahora</span>
+              <ArrowRight className="size-4" />
+            </Button>
+          </Link>
+        </div>
       </div>
     );
   }
@@ -105,14 +116,14 @@ function ResetPasswordForm() {
       {/* Encabezado */}
       <div className="space-y-2 text-left">
         <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-          <Key className="size-3" />
+          <KeyRound className="size-3" />
           <span>Restablecer Contraseña</span>
         </div>
         <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-neutral-900 dark:text-white">
           Crear Nueva Contraseña
         </h1>
-        <p className="text-sm text-neutral-500 dark:text-neutral-400">
-          Ingresa tu nueva clave de acceso para proteger tu negocio y finanzas.
+        <p className="text-sm text-neutral-500 dark:text-neutral-400 leading-relaxed">
+          Ingresa tu correo, la clave de 8 dígitos recibida y tu nueva contraseña.
         </p>
       </div>
 
@@ -126,26 +137,54 @@ function ResetPasswordForm() {
 
       {/* Formulario */}
       <form onSubmit={handleSubmit} className="space-y-3.5">
-        {/* Token (solo visible si no vino en URL) */}
-        {!tokenFromUrl && (
-          <div className="space-y-1.5">
-            <Label htmlFor="token" className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">
-              Token de Verificación
-            </Label>
-            <div className="relative">
-              <Key className="absolute left-3.5 top-3 size-4 text-neutral-400" />
-              <Input
-                id="token"
-                type="text"
-                placeholder="Pega aquí el token recibido"
-                className="pl-10 h-10 rounded-xl bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 text-xs focus-visible:ring-emerald-500"
-                value={token}
-                onChange={(e) => setToken(e.target.value)}
-                required
-              />
-            </div>
+        {/* Correo Electrónico */}
+        <div className="space-y-1.5">
+          <Label htmlFor="email" className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">
+            Correo Electrónico Registrado
+          </Label>
+          <div className="relative">
+            <Mail className="absolute left-3.5 top-3 size-4 text-neutral-400" />
+            <Input
+              id="email"
+              type="email"
+              placeholder="tu@negocio.com"
+              className="pl-10 h-10 rounded-xl bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 text-sm focus-visible:ring-emerald-500"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
           </div>
-        )}
+        </div>
+
+        {/* Clave de 8 Dígitos */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="code" className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">
+              Clave de 8 Dígitos Numéricos
+            </Label>
+            <Link
+              href="/forgot-password"
+              className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 hover:underline"
+            >
+              ¿No tienes código? Solicítalo aquí
+            </Link>
+          </div>
+          <div className="relative">
+            <ShieldCheck className="absolute left-3.5 top-3 size-4 text-neutral-400" />
+            <Input
+              id="code"
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={8}
+              placeholder="12345678"
+              className="pl-10 h-10 rounded-xl bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 text-sm font-mono tracking-widest font-bold focus-visible:ring-emerald-500"
+              value={code}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 8))}
+              required
+            />
+          </div>
+        </div>
 
         {/* Nueva Contraseña */}
         <div className="space-y-1.5">
@@ -163,7 +202,6 @@ function ResetPasswordForm() {
               onChange={(e) => setNewPassword(e.target.value)}
               required
               minLength={6}
-              autoFocus
             />
             <button
               type="button"
@@ -196,16 +234,28 @@ function ResetPasswordForm() {
           </div>
         </div>
 
+        {/* Validaciones */}
+        <div className="space-y-1 pt-1 text-[11px]">
+          <div className={`flex items-center gap-1.5 ${newPassword.length >= 6 ? "text-emerald-600 dark:text-emerald-400" : "text-neutral-400"}`}>
+            <span className={`size-1.5 rounded-full ${newPassword.length >= 6 ? "bg-emerald-500" : "bg-neutral-300 dark:bg-neutral-700"}`} />
+            <span>Al menos 6 caracteres</span>
+          </div>
+          <div className={`flex items-center gap-1.5 ${newPassword && confirmPassword && newPassword === confirmPassword ? "text-emerald-600 dark:text-emerald-400" : "text-neutral-400"}`}>
+            <span className={`size-1.5 rounded-full ${newPassword && confirmPassword && newPassword === confirmPassword ? "bg-emerald-500" : "bg-neutral-300 dark:bg-neutral-700"}`} />
+            <span>Las contraseñas coinciden</span>
+          </div>
+        </div>
+
         {/* Botón */}
         <Button
           type="submit"
           className="w-full h-11 font-bold text-sm rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-600/20 transition-all duration-200 hover:shadow-lg hover:shadow-emerald-600/30 gap-2 cursor-pointer mt-2"
-          disabled={loading}
+          disabled={loading || newPassword.length < 6 || newPassword !== confirmPassword || code.length !== 8}
         >
           {loading ? (
             <div className="flex items-center gap-2">
               <div className="size-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-              <span>Guardando nueva contraseña...</span>
+              <span>Restableciendo contraseña...</span>
             </div>
           ) : (
             <>
