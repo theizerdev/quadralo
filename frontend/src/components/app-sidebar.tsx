@@ -54,7 +54,7 @@ export function AppSidebar() {
   return (
     <Sidebar>
       <SidebarHeader>
-        <AppLogo name={user?.business_name || "ADATOV"} />
+        <AppLogo name={user?.business_name || "Quádralo"} />
       </SidebarHeader>
 
       <SidebarContent>

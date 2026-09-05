@@ -42,9 +42,9 @@ export default function LoginPage() {
           <div className="mx-auto w-12 h-12 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-md mb-2">
             <DollarSign className="w-7 h-7" />
           </div>
-          <CardTitle className="text-2xl font-bold tracking-tight">ADATOV SaaS</CardTitle>
+          <CardTitle className="text-2xl font-bold tracking-tight">Quádralo</CardTitle>
           <CardDescription>
-            Ingresa a tu cuenta para gestionar inversiones, tasa BCV y ventas
+            Tus finanzas siempre al día. Ingresa para gestionar tus ventas e inversiones.
           </CardDescription>
         </CardHeader>
         <CardContent>
