@@ -35,4 +35,9 @@ def get_current_user(
         raise credentials_exception
     if not user.is_active:
         raise HTTPException(status_code=400, detail="Inactive user")
+    if not user.is_verified and not user.is_superuser:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Tu correo electrónico no ha sido verificado. Por favor introduce el código de 8 dígitos para activar tu cuenta."
+        )
     return user

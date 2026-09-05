@@ -19,17 +19,21 @@ export default function AppLayout({
   const pathname = usePathname();
 
   useEffect(() => {
-    if (!loading && !user) {
-      router.push("/login");
+    if (!loading) {
+      if (!user) {
+        router.push("/login");
+      } else if (user.is_verified === false && !user.is_superuser) {
+        router.push(`/verify-email?email=${encodeURIComponent(user.email)}`);
+      }
     }
   }, [user, loading, router]);
 
-  if (loading || !user) {
+  if (loading || !user || (user.is_verified === false && !user.is_superuser)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-neutral-50 dark:bg-neutral-950">
         <div className="flex flex-col items-center gap-3">
-          <div className="size-8 animate-spin rounded-full border-2 border-neutral-300 border-t-neutral-900 dark:border-neutral-700 dark:border-t-white"></div>
-          <p className="text-xs text-neutral-500 font-medium">Iniciando sesión...</p>
+          <div className="size-8 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent"></div>
+          <p className="text-xs text-neutral-500 font-medium">Verificando acceso a Quádralo...</p>
         </div>
       </div>
     );
