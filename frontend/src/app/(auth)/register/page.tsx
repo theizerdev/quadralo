@@ -133,6 +133,11 @@ export default function RegisterPage() {
 
   return (
     <div className="space-y-6">
+      <title>Registrar Negocio | Quádralo</title>
+      <meta
+        name="description"
+        content="Crea tu cuenta gratis en Quádralo. Controla tus ventas, registra compras y calcula tus márgenes con la tasa oficial BCV en tiempo real."
+      />
       {/* -------------------- PASO 1: FORMULARIO DE REGISTRO -------------------- */}
       {step === "form" && (
         <>
