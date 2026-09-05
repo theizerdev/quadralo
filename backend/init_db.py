@@ -100,6 +100,21 @@ def create_tables():
                     conn.execute(text("ALTER TABLE users ADD COLUMN reset_code_expires_at DATETIME NULL AFTER reset_code;"))
                     conn.commit()
                     print("[OK] Columna 'reset_code_expires_at' agregada exitosamente a la tabla 'users'.")
+                if "is_verified" not in columns:
+                    print("[*] Aplicando actualizacion: agregando columna 'is_verified' a la tabla 'users'...")
+                    conn.execute(text("ALTER TABLE users ADD COLUMN is_verified BOOLEAN NOT NULL DEFAULT 1 AFTER is_active;"))
+                    conn.commit()
+                    print("[OK] Columna 'is_verified' agregada exitosamente a la tabla 'users'.")
+                if "verification_code" not in columns:
+                    print("[*] Aplicando actualizacion: agregando columna 'verification_code' a la tabla 'users'...")
+                    conn.execute(text("ALTER TABLE users ADD COLUMN verification_code VARCHAR(8) NULL AFTER is_verified;"))
+                    conn.commit()
+                    print("[OK] Columna 'verification_code' agregada exitosamente a la tabla 'users'.")
+                if "verification_code_expires_at" not in columns:
+                    print("[*] Aplicando actualizacion: agregando columna 'verification_code_expires_at' a la tabla 'users'...")
+                    conn.execute(text("ALTER TABLE users ADD COLUMN verification_code_expires_at DATETIME NULL AFTER verification_code;"))
+                    conn.commit()
+                    print("[OK] Columna 'verification_code_expires_at' agregada exitosamente a la tabla 'users'.")
 
         print(f"[OK] Tablas registradas exitosamente en la base de datos:")
         for t in tables:

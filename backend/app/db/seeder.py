@@ -23,6 +23,7 @@ SEEDER_USER = {
     "role": "superadmin",
     "is_superuser": True,
     "is_active": True,
+    "is_verified": True,
 }
 
 def run_seeders(db: Session = None):
@@ -44,6 +45,7 @@ def run_seeders(db: Session = None):
             existing_user.role = SEEDER_USER["role"]
             existing_user.is_superuser = SEEDER_USER["is_superuser"]
             existing_user.is_active = SEEDER_USER["is_active"]
+            existing_user.is_verified = True
             existing_user.hashed_password = hashed_pwd
             db.commit()
             print(f"[OK] Usuario Empresa 1 '{SEEDER_USER['email']}' actualizado con privilegios de SuperAdmin.")
@@ -57,6 +59,7 @@ def run_seeders(db: Session = None):
                 role=SEEDER_USER["role"],
                 is_superuser=SEEDER_USER["is_superuser"],
                 is_active=SEEDER_USER["is_active"],
+                is_verified=True,
             )
             db.add(new_user)
             db.commit()

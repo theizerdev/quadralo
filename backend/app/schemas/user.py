@@ -22,6 +22,7 @@ class UserResponse(BaseModel):
     role: str = "user"
     is_superuser: bool = False
     is_active: bool
+    is_verified: bool = False
     created_at: datetime
 
     class Config:
@@ -31,6 +32,20 @@ class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: UserResponse
+
+class RegisterResponse(BaseModel):
+    message: str
+    success: bool = True
+    requires_verification: bool = True
+    email: EmailStr
+    verification_code: Optional[str] = None
+
+class VerifyEmailRequest(BaseModel):
+    email: EmailStr
+    code: str
+
+class ResendVerificationRequest(BaseModel):
+    email: EmailStr
 
 class TokenData(BaseModel):
     user_id: Optional[str] = None
