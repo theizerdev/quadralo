@@ -64,7 +64,7 @@ def create_tables():
     print("[*] Inicializando modelos y creando tablas...")
     try:
         from app.db.database import Base, engine
-        from app.models import user, investment, bcv, sale
+        from app.models import user, investment, bcv, sale, integration
 
         Base.metadata.create_all(bind=engine)
         

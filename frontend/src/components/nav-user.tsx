@@ -14,7 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { ChevronsUpDown, LogOut, User, Settings, Sparkles, Download } from "lucide-react";
+import { ChevronsUpDown, LogOut, User, Settings, Sparkles, Download, Crown, Phone, ShieldCheck } from "lucide-react";
 
 export function NavUser() {
   const { user, logout } = useAuth();
@@ -23,6 +23,7 @@ export function NavUser() {
   if (!user) return null;
 
   const isExpanded = open || isMobile;
+  const isSuperAdmin = user.is_superuser || user.role === "superadmin";
 
   const initials = user.full_name
     ? user.full_name
@@ -42,16 +43,30 @@ export function NavUser() {
             !isExpanded && "justify-center p-1"
           )}
         >
-          <Avatar className="size-8">
-            <AvatarFallback>{initials}</AvatarFallback>
-          </Avatar>
+          <div className="relative">
+            <Avatar className="size-8">
+              <AvatarFallback className={isSuperAdmin ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold" : ""}>
+                {initials}
+              </AvatarFallback>
+            </Avatar>
+            {isSuperAdmin && (
+              <span className="absolute -top-1 -right-1 size-3.5 rounded-full bg-amber-500 text-white flex items-center justify-center text-[8px] shadow-xs">
+                ★
+              </span>
+            )}
+          </div>
 
           {isExpanded && (
             <>
               <div className="grid flex-1 text-left text-xs leading-tight overflow-hidden">
-                <span className="truncate font-semibold text-neutral-900 dark:text-white">
-                  {user.full_name}
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className="truncate font-semibold text-neutral-900 dark:text-white">
+                    {user.full_name}
+                  </span>
+                  {isSuperAdmin && (
+                    <Crown className="size-3 text-amber-500 shrink-0" />
+                  )}
+                </div>
                 <span className="truncate text-[11px] text-neutral-500 dark:text-neutral-400">
                   {user.email}
                 </span>
@@ -63,19 +78,30 @@ export function NavUser() {
       </DropdownMenuTrigger>
 
       <DropdownMenuContent
-        className="w-56"
+        className="w-60"
         side={isMobile ? "bottom" : "right"}
         align="end"
         sideOffset={4}
       >
         <DropdownMenuLabel className="p-0 font-normal">
-          <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-            <Avatar className="size-8">
-              <AvatarFallback>{initials}</AvatarFallback>
+          <div className="flex items-center gap-2.5 px-2 py-2 text-left text-sm">
+            <Avatar className="size-9">
+              <AvatarFallback className={isSuperAdmin ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold" : ""}>
+                {initials}
+              </AvatarFallback>
             </Avatar>
             <div className="grid flex-1 text-left text-xs leading-tight">
-              <span className="truncate font-semibold">{user.full_name}</span>
+              <div className="flex items-center gap-1">
+                <span className="truncate font-bold text-neutral-900 dark:text-white">{user.full_name}</span>
+                {isSuperAdmin && <Crown className="size-3 text-amber-500" />}
+              </div>
               <span className="truncate text-[11px] text-neutral-500">{user.email}</span>
+              {isSuperAdmin && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-600 dark:text-amber-400 mt-0.5">
+                  <ShieldCheck className="size-3" />
+                  Empresa Principal • SuperAdmin
+                </span>
+              )}
             </div>
           </div>
         </DropdownMenuLabel>
@@ -83,9 +109,17 @@ export function NavUser() {
         <DropdownMenuSeparator />
 
         <DropdownMenuGroup>
-          <DropdownMenuItem>
-            <Sparkles className="size-4 text-blue-600 dark:text-blue-400" />
-            <span className="truncate">{user.business_name}</span>
+          <DropdownMenuItem className="flex flex-col items-start gap-1 py-2">
+            <div className="flex items-center gap-1.5 w-full">
+              <Sparkles className="size-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+              <span className="truncate font-semibold text-xs">{user.business_name}</span>
+            </div>
+            {user.phone && (
+              <div className="flex items-center gap-1.5 text-[11px] text-neutral-500 dark:text-neutral-400 pl-5">
+                <Phone className="size-3 text-neutral-400" />
+                <span>{user.phone}</span>
+              </div>
+            )}
           </DropdownMenuItem>
         </DropdownMenuGroup>
 

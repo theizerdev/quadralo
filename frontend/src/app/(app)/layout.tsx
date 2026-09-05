@@ -44,6 +44,11 @@ export default function AppLayout({
     breadcrumbs.push({ title: "Ganancias", href: "/ganancias" });
   } else if (pathname?.startsWith("/bcv")) {
     breadcrumbs.push({ title: "Tasa BCV", href: "/bcv" });
+  } else if (pathname?.startsWith("/integraciones")) {
+    breadcrumbs.push({ title: "Integraciones", href: "/integraciones/smtp" });
+    if (pathname.includes("/smtp")) {
+      breadcrumbs.push({ title: "SMTP de Google", href: "/integraciones/smtp" });
+    }
   } else {
     breadcrumbs.push({ title: "Dashboard", href: "/dashboard" });
   }

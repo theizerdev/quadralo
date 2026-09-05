@@ -16,10 +16,12 @@ import {
   TrendingUp,
   ShoppingCart,
   DollarSign,
+  Blocks,
+  Mail,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
-const mainNavItems: NavItem[] = [
+const baseNavItems: NavItem[] = [
   {
     title: "Dashboard",
     href: "/dashboard",
@@ -50,6 +52,27 @@ const mainNavItems: NavItem[] = [
 
 export function AppSidebar() {
   const { user } = useAuth();
+  const isSuperAdmin = user?.is_superuser || user?.role === "superadmin";
+
+  const navItems: NavItem[] = [...baseNavItems];
+
+  // Menú de Integraciones exclusivo para el Usuario 1 (Empresa Principal / SuperAdmin)
+  if (isSuperAdmin) {
+    navItems.push({
+      title: "Integraciones",
+      href: "/integraciones",
+      icon: Blocks,
+      badge: "Empresa 1",
+      items: [
+        {
+          title: "SMTP de Google",
+          href: "/integraciones/smtp",
+          icon: Mail,
+          badge: "Email",
+        },
+      ],
+    });
+  }
 
   return (
     <Sidebar>
@@ -58,7 +81,7 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent>
-        <NavMain items={mainNavItems} />
+        <NavMain items={navItems} />
       </SidebarContent>
 
       <SidebarFooter>
