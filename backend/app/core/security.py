@@ -25,3 +25,20 @@ def create_access_token(subject: Union[str, Any], expires_delta: timedelta = Non
     to_encode = {"exp": expire, "sub": str(subject)}
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
     return encoded_jwt
+
+def create_reset_token(subject: Union[str, Any]) -> str:
+    """Token de restablecimiento de contraseña válido por 30 minutos."""
+    expire = datetime.now(timezone.utc) + timedelta(minutes=30)
+    to_encode = {"exp": expire, "sub": str(subject), "type": "password_reset"}
+    return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+
+def verify_reset_token(token: str) -> Union[str, None]:
+    """Verifica la validez del token de restablecimiento de contraseña."""
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        if payload.get("type") != "password_reset":
+            return None
+        return payload.get("sub")
+    except Exception:
+        return None
+
