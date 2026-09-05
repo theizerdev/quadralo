@@ -1,8 +1,8 @@
 {
-  "name": "adatov-root",
+  "name": "quadralo-root",
   "version": "1.0.0",
   "private": true,
-  "description": "ADATOV - Sistema SaaS de Gestión e Inversiones",
+  "description": "Quádralo - Sistema SaaS de Gestión e Inversiones",
   "scripts": {
     "dev": "concurrently -k -n \"BACKEND,FRONTEND\" -c \"blue.bold,green.bold\" \"npm run dev:backend\" \"npm run dev:frontend\"",
     "dev:backend": "cd backend && venv\\Scripts\\python -m uvicorn app.main:app --reload --port 8000",
