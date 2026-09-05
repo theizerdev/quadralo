@@ -1,4 +1,5 @@
-from typing import List
+from typing import List, Optional
+from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -79,15 +80,62 @@ def create_investment(
 
 @router.get("/summary", response_model=InvestmentSummary)
 def get_investment_summary(
+    preset: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Obtener métricas acumuladas de inversión para el usuario."""
-    investments = (
-        db.query(Investment)
-        .filter(Investment.user_id == current_user.id)
-        .all()
-    )
+    """Obtener métricas acumuladas de inversión para el usuario con soporte de filtros de fechas."""
+    now = datetime.now()
+    start_dt = None
+    end_dt = None
+
+    if preset == "today":
+        start_dt = datetime(now.year, now.month, now.day, 0, 0, 0)
+        end_dt = datetime(now.year, now.month, now.day, 23, 59, 59)
+    elif preset == "7d":
+        start_dt = (now - timedelta(days=6)).replace(hour=0, minute=0, second=0, microsecond=0)
+        end_dt = datetime(now.year, now.month, now.day, 23, 59, 59)
+    elif preset == "30d":
+        start_dt = (now - timedelta(days=29)).replace(hour=0, minute=0, second=0, microsecond=0)
+        end_dt = datetime(now.year, now.month, now.day, 23, 59, 59)
+    elif preset == "this_month":
+        start_dt = datetime(now.year, now.month, 1, 0, 0, 0)
+        next_month = now.month + 1 if now.month < 12 else 1
+        next_year = now.year if now.month < 12 else now.year + 1
+        end_dt = datetime(next_year, next_month, 1, 0, 0, 0) - timedelta(seconds=1)
+    elif preset == "last_month":
+        first_of_this_month = datetime(now.year, now.month, 1, 0, 0, 0)
+        end_dt = first_of_this_month - timedelta(seconds=1)
+        start_dt = datetime(end_dt.year, end_dt.month, 1, 0, 0, 0)
+    elif preset == "this_year":
+        start_dt = datetime(now.year, 1, 1, 0, 0, 0)
+        end_dt = datetime(now.year, 12, 31, 23, 59, 59)
+    elif preset == "all":
+        start_dt = None
+        end_dt = None
+    elif preset == "custom" or (start_date or end_date):
+        if start_date:
+            try:
+                p_start = datetime.strptime(start_date.split("T")[0], "%Y-%m-%d")
+                start_dt = datetime(p_start.year, p_start.month, p_start.day, 0, 0, 0)
+            except Exception:
+                pass
+        if end_date:
+            try:
+                p_end = datetime.strptime(end_date.split("T")[0], "%Y-%m-%d")
+                end_dt = datetime(p_end.year, p_end.month, p_end.day, 23, 59, 59)
+            except Exception:
+                pass
+
+    query = db.query(Investment).filter(Investment.user_id == current_user.id)
+    if start_dt:
+        query = query.filter(Investment.created_at >= start_dt)
+    if end_dt:
+        query = query.filter(Investment.created_at <= end_dt)
+
+    investments = query.all()
 
     total_usd = sum(inv.total_cost_usd for inv in investments)
     total_ves = sum(inv.amount_ves + (inv.shipping_cost_usd * inv.bcv_rate) for inv in investments)
@@ -105,6 +153,7 @@ def get_investment_summary(
         investments_count=len(investments),
         current_bcv_rate=current_rate
     )
+
 
 @router.get("/{investment_id}", response_model=InvestmentResponse)
 def get_investment_by_id(
