@@ -71,12 +71,36 @@ def create_tables():
         inspector = inspect(engine)
         tables = inspector.get_table_names()
         
+        # Migración automática si la tabla users ya existía sin las columnas requeridas
+        if "users" in tables:
+            columns = [col["name"] for col in inspector.get_columns("users")]
+            with engine.connect() as conn:
+                if "phone" not in columns:
+                    print("[*] Aplicando actualizacion: agregando columna 'phone' a la tabla 'users'...")
+                    conn.execute(text("ALTER TABLE users ADD COLUMN phone VARCHAR(50) NULL AFTER business_name;"))
+                    conn.commit()
+                    print("[OK] Columna 'phone' agregada exitosamente a la tabla 'users'.")
+                if "role" not in columns:
+                    print("[*] Aplicando actualizacion: agregando columna 'role' a la tabla 'users'...")
+                    conn.execute(text("ALTER TABLE users ADD COLUMN role VARCHAR(50) NOT NULL DEFAULT 'user' AFTER phone;"))
+                    conn.commit()
+                    print("[OK] Columna 'role' agregada exitosamente a la tabla 'users'.")
+                if "is_superuser" not in columns:
+                    print("[*] Aplicando actualizacion: agregando columna 'is_superuser' a la tabla 'users'...")
+                    conn.execute(text("ALTER TABLE users ADD COLUMN is_superuser BOOLEAN NOT NULL DEFAULT 0 AFTER role;"))
+                    conn.commit()
+                    print("[OK] Columna 'is_superuser' agregada exitosamente a la tabla 'users'.")
+
         print(f"[OK] Tablas registradas exitosamente en la base de datos:")
         for t in tables:
             print(f"     -> {t}")
         
+        # Ejecutar Seeders del sistema (Empresa 1 - Theizer dev)
+        from app.db.seeder import run_seeders
+        run_seeders()
+
         print("\n" + "="*60)
-        print("  [OK] BASE DE DATOS Y TABLAS CONFIGURADAS CON EXITO")
+        print("  [OK] BASE DE DATOS, TABLAS Y SEEDERS CONFIGURADOS CON EXITO")
         print("="*60)
         return True
     except Exception as e:

@@ -12,6 +12,7 @@ import {
   Lock,
   Mail,
   User,
+  Phone,
   ArrowRight,
   Eye,
   EyeOff,
@@ -24,6 +25,7 @@ export default function RegisterPage() {
   const [fullName, setFullName] = useState("");
   const [businessName, setBusinessName] = useState("");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -41,6 +43,7 @@ export default function RegisterPage() {
           full_name: fullName,
           business_name: businessName,
           email,
+          phone: phone.trim(),
           password,
         }),
       });
@@ -131,6 +134,28 @@ export default function RegisterPage() {
               className="pl-10 h-10 rounded-xl bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 text-sm focus-visible:ring-emerald-500"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </div>
+        </div>
+
+        {/* Campo: Teléfono / WhatsApp */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="phone" className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">
+              Número Telefónico / WhatsApp
+            </Label>
+            <span className="text-[10px] text-neutral-400">Para alertas y soporte</span>
+          </div>
+          <div className="relative">
+            <Phone className="absolute left-3.5 top-3 size-4 text-neutral-400" />
+            <Input
+              id="phone"
+              type="tel"
+              placeholder="Ej: +58 412 1234567 o 0414 1234567"
+              className="pl-10 h-10 rounded-xl bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 text-sm focus-visible:ring-emerald-500"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
               required
             />
           </div>

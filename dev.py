@@ -24,6 +24,12 @@ def main():
         res = subprocess.run([python_exec, init_db_script], cwd=backend_dir)
         sys.exit(res.returncode)
 
+    if "--seed" in sys.argv:
+        seed_script = os.path.join(backend_dir, "seed.py")
+        print(f"[*] Ejecutando Seeders con: {python_exec}")
+        res = subprocess.run([python_exec, seed_script], cwd=backend_dir)
+        sys.exit(res.returncode)
+
     print("\n" + "="*55)
     print("      QUÁDRALO - Servidor Fullstack Iniciado")
     print("="*55)

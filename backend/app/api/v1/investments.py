@@ -22,13 +22,11 @@ def get_user_investments(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Listar todas las inversiones registradas del usuario autenticado (READ - List)."""
-    return (
-        db.query(Investment)
-        .filter(Investment.user_id == current_user.id)
-        .order_by(Investment.created_at.desc())
-        .all()
-    )
+    """Listar todas las inversiones registradas del usuario autenticado o todas si es SuperAdmin (READ - List)."""
+    query = db.query(Investment)
+    if not (current_user.is_superuser or current_user.role == "superadmin"):
+        query = query.filter(Investment.user_id == current_user.id)
+    return query.order_by(Investment.created_at.desc()).all()
 
 @router.post("/", response_model=InvestmentResponse, status_code=status.HTTP_201_CREATED)
 def create_investment(
@@ -129,7 +127,9 @@ def get_investment_summary(
             except Exception:
                 pass
 
-    query = db.query(Investment).filter(Investment.user_id == current_user.id)
+    query = db.query(Investment)
+    if not (current_user.is_superuser or current_user.role == "superadmin"):
+        query = query.filter(Investment.user_id == current_user.id)
     if start_dt:
         query = query.filter(Investment.created_at >= start_dt)
     if end_dt:
@@ -162,11 +162,10 @@ def get_investment_by_id(
     current_user: User = Depends(get_current_user)
 ):
     """Obtener el detalle de una inversión específica (READ - Detail)."""
-    investment = (
-        db.query(Investment)
-        .filter(Investment.id == investment_id, Investment.user_id == current_user.id)
-        .first()
-    )
+    query = db.query(Investment).filter(Investment.id == investment_id)
+    if not (current_user.is_superuser or current_user.role == "superadmin"):
+        query = query.filter(Investment.user_id == current_user.id)
+    investment = query.first()
     if not investment:
         raise HTTPException(status_code=404, detail="Inversión no encontrada")
     return investment
@@ -179,11 +178,10 @@ def update_investment(
     current_user: User = Depends(get_current_user)
 ):
     """Editar y actualizar una compra/inversión existente con recálculo automático (UPDATE)."""
-    investment = (
-        db.query(Investment)
-        .filter(Investment.id == investment_id, Investment.user_id == current_user.id)
-        .first()
-    )
+    query = db.query(Investment).filter(Investment.id == investment_id)
+    if not (current_user.is_superuser or current_user.role == "superadmin"):
+        query = query.filter(Investment.user_id == current_user.id)
+    investment = query.first()
     if not investment:
         raise HTTPException(status_code=404, detail="Inversión no encontrada")
 
@@ -224,11 +222,10 @@ def delete_investment(
     current_user: User = Depends(get_current_user)
 ):
     """Eliminar un registro de inversión (DELETE)."""
-    investment = (
-        db.query(Investment)
-        .filter(Investment.id == investment_id, Investment.user_id == current_user.id)
-        .first()
-    )
+    query = db.query(Investment).filter(Investment.id == investment_id)
+    if not (current_user.is_superuser or current_user.role == "superadmin"):
+        query = query.filter(Investment.user_id == current_user.id)
+    investment = query.first()
     if not investment:
         raise HTTPException(status_code=404, detail="Inversión no encontrada")
 

@@ -9,6 +9,7 @@
     "dev:backend": "cd backend && (venv\\Scripts\\python -m uvicorn app.main:app --reload --port 8000 || venv/bin/python -m uvicorn app.main:app --reload --port 8000)",
     "dev:frontend": "cd frontend && npm run dev",
     "init:db": "python dev.py --init-db",
+    "seed": "python dev.py --seed",
     "setup": "npm run install:all && npm run init:db",
     "install:all": "npm install && cd frontend && npm install"
   },

@@ -7,6 +7,7 @@ class UserCreate(BaseModel):
     password: str
     full_name: str
     business_name: str
+    phone: Optional[str] = None
 
 class UserLogin(BaseModel):
     email: EmailStr
@@ -17,6 +18,9 @@ class UserResponse(BaseModel):
     email: EmailStr
     full_name: str
     business_name: str
+    phone: Optional[str] = None
+    role: str = "user"
+    is_superuser: bool = False
     is_active: bool
     created_at: datetime
 

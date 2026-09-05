@@ -29,13 +29,11 @@ def get_user_sales(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Listar todas las ventas registradas del usuario autenticado."""
-    return (
-        db.query(Sale)
-        .filter(Sale.user_id == current_user.id)
-        .order_by(Sale.created_at.desc())
-        .all()
-    )
+    """Listar todas las ventas registradas del usuario autenticado o todas si es SuperAdmin."""
+    query = db.query(Sale)
+    if not (current_user.is_superuser or current_user.role == "superadmin"):
+        query = query.filter(Sale.user_id == current_user.id)
+    return query.order_by(Sale.created_at.desc()).all()
 
 @router.post("/", response_model=SaleResponse, status_code=status.HTTP_201_CREATED)
 def create_sale(
@@ -208,7 +206,9 @@ def get_sales_analytics(
             except Exception:
                 pass
 
-    query = db.query(Sale).filter(Sale.user_id == current_user.id)
+    query = db.query(Sale)
+    if not (current_user.is_superuser or current_user.role == "superadmin"):
+        query = query.filter(Sale.user_id == current_user.id)
     if start_dt:
         query = query.filter(Sale.created_at >= start_dt)
     if end_dt:
@@ -423,11 +423,10 @@ def get_sale_by_id(
     current_user: User = Depends(get_current_user)
 ):
     """Obtener el detalle de una venta específica."""
-    sale = (
-        db.query(Sale)
-        .filter(Sale.id == sale_id, Sale.user_id == current_user.id)
-        .first()
-    )
+    query = db.query(Sale).filter(Sale.id == sale_id)
+    if not (current_user.is_superuser or current_user.role == "superadmin"):
+        query = query.filter(Sale.user_id == current_user.id)
+    sale = query.first()
     if not sale:
         raise HTTPException(status_code=404, detail="Venta no encontrada")
     return sale
@@ -440,11 +439,10 @@ def update_sale(
     current_user: User = Depends(get_current_user)
 ):
     """Editar y actualizar un registro de venta existente con recálculo automático."""
-    sale = (
-        db.query(Sale)
-        .filter(Sale.id == sale_id, Sale.user_id == current_user.id)
-        .first()
-    )
+    query = db.query(Sale).filter(Sale.id == sale_id)
+    if not (current_user.is_superuser or current_user.role == "superadmin"):
+        query = query.filter(Sale.user_id == current_user.id)
+    sale = query.first()
     if not sale:
         raise HTTPException(status_code=404, detail="Venta no encontrada")
 
@@ -497,11 +495,10 @@ def delete_sale(
     current_user: User = Depends(get_current_user)
 ):
     """Eliminar un registro de venta."""
-    sale = (
-        db.query(Sale)
-        .filter(Sale.id == sale_id, Sale.user_id == current_user.id)
-        .first()
-    )
+    query = db.query(Sale).filter(Sale.id == sale_id)
+    if not (current_user.is_superuser or current_user.role == "superadmin"):
+        query = query.filter(Sale.user_id == current_user.id)
+    sale = query.first()
     if not sale:
         raise HTTPException(status_code=404, detail="Venta no encontrada")
 
