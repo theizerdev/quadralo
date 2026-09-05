@@ -1,0 +1,69 @@
+import type { MetadataRoute } from "next";
+
+export default function manifest(): MetadataRoute.Manifest {
+  return {
+    name: "Quádralo - Finanzas e Inversiones",
+    short_name: "Quádralo",
+    description: "Tus finanzas siempre al día. Gestión de inversiones, ventas y márgenes en tiempo real.",
+    start_url: "/dashboard",
+    display: "standalone",
+    background_color: "#090D16",
+    theme_color: "#10B981",
+    orientation: "portrait-primary",
+    scope: "/",
+    categories: ["finance", "business", "productivity"],
+    lang: "es",
+    icons: [
+      {
+        src: "/icons/icon-192x192.png",
+        sizes: "192x192",
+        type: "image/png",
+        purpose: "any",
+      },
+      {
+        src: "/icons/icon-512x512.png",
+        sizes: "512x512",
+        type: "image/png",
+        purpose: "any",
+      },
+      {
+        src: "/icons/icon-maskable-512x512.png",
+        sizes: "512x512",
+        type: "image/png",
+        purpose: "maskable",
+      },
+      {
+        src: "/icon.svg",
+        sizes: "any",
+        type: "image/svg+xml",
+        purpose: "any",
+      },
+    ],
+    shortcuts: [
+      {
+        name: "Dashboard",
+        url: "/dashboard",
+        description: "Ver resumen financiero general",
+        icons: [{ src: "/icons/icon-192x192.png", sizes: "192x192" }],
+      },
+      {
+        name: "Ventas",
+        url: "/ventas",
+        description: "Registrar o consultar ventas",
+        icons: [{ src: "/icons/icon-192x192.png", sizes: "192x192" }],
+      },
+      {
+        name: "Inversiones",
+        url: "/inversiones",
+        description: "Gestionar compras e inventario",
+        icons: [{ src: "/icons/icon-192x192.png", sizes: "192x192" }],
+      },
+      {
+        name: "Ganancias",
+        url: "/ganancias",
+        description: "Analítica y márgenes de rentabilidad",
+        icons: [{ src: "/icons/icon-192x192.png", sizes: "192x192" }],
+      },
+    ],
+  };
+}

@@ -14,7 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { ChevronsUpDown, LogOut, User, Settings, Sparkles } from "lucide-react";
+import { ChevronsUpDown, LogOut, User, Settings, Sparkles, Download } from "lucide-react";
 
 export function NavUser() {
   const { user, logout } = useAuth();
@@ -92,6 +92,17 @@ export function NavUser() {
         <DropdownMenuSeparator />
 
         <DropdownMenuGroup>
+          <DropdownMenuItem
+            onClick={() => {
+              if (typeof window !== "undefined") {
+                window.dispatchEvent(new CustomEvent("quadralo:install-pwa"));
+              }
+            }}
+            className="text-emerald-600 dark:text-emerald-400 font-medium cursor-pointer"
+          >
+            <Download className="size-4" />
+            <span>Instalar App PWA</span>
+          </DropdownMenuItem>
           <DropdownMenuItem>
             <User className="size-4" />
             <span>Mi Perfil</span>
