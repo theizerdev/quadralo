@@ -53,9 +53,18 @@ export default function LoginPage() {
 
       {/* Mensaje de Error */}
       {error && (
-        <div className="p-3.5 rounded-xl bg-red-50 text-red-700 text-xs sm:text-sm border border-red-200 dark:bg-red-950/50 dark:text-red-300 dark:border-red-800 animate-in fade-in duration-200">
-          <div className="font-semibold mb-0.5">Error de acceso</div>
+        <div className="p-3.5 rounded-xl bg-red-50 text-red-700 text-xs sm:text-sm border border-red-200 dark:bg-red-950/50 dark:text-red-300 dark:border-red-800 animate-in fade-in duration-200 space-y-2">
+          <div className="font-semibold">Error de acceso</div>
           <div>{error}</div>
+          {error.toLowerCase().includes("verificar") && (
+            <div className="pt-1.5 border-t border-red-200 dark:border-red-800/60">
+              <Link href={`/verify-email?email=${encodeURIComponent(email)}`}>
+                <Button size="sm" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold gap-1.5 shadow-sm cursor-pointer">
+                  <span>Ingresar Clave de 8 Dígitos y Activar Cuenta →</span>
+                </Button>
+              </Link>
+            </div>
+          )}
         </div>
       )}
 
