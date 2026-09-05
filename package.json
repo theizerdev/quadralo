@@ -4,9 +4,12 @@
   "private": true,
   "description": "Quádralo - Sistema SaaS de Gestión e Inversiones",
   "scripts": {
-    "dev": "concurrently -k -n \"BACKEND,FRONTEND\" -c \"blue.bold,green.bold\" \"npm run dev:backend\" \"npm run dev:frontend\"",
-    "dev:backend": "cd backend && venv\\Scripts\\python -m uvicorn app.main:app --reload --port 8000",
+    "dev": "python dev.py",
+    "dev:concurrent": "concurrently -k -n \"BACKEND,FRONTEND\" -c \"blue.bold,green.bold\" \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd backend && (venv\\Scripts\\python -m uvicorn app.main:app --reload --port 8000 || venv/bin/python -m uvicorn app.main:app --reload --port 8000)",
     "dev:frontend": "cd frontend && npm run dev",
+    "init:db": "python dev.py --init-db",
+    "setup": "npm run install:all && npm run init:db",
     "install:all": "npm install && cd frontend && npm install"
   },
   "devDependencies": {

@@ -14,7 +14,15 @@ def main():
     
     python_exec = os.path.join(backend_dir, "venv", "Scripts", "python.exe")
     if not os.path.exists(python_exec):
+        python_exec = os.path.join(backend_dir, "venv", "bin", "python")
+    if not os.path.exists(python_exec):
         python_exec = sys.executable
+
+    if "--init-db" in sys.argv:
+        init_db_script = os.path.join(backend_dir, "init_db.py")
+        print(f"[*] Ejecutando inicializador de base de datos con: {python_exec}")
+        res = subprocess.run([python_exec, init_db_script], cwd=backend_dir)
+        sys.exit(res.returncode)
 
     print("\n" + "="*55)
     print("      QUÁDRALO - Servidor Fullstack Iniciado")
