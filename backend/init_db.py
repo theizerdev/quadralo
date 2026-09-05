@@ -34,7 +34,7 @@ def create_database_if_not_exists():
         db_name = url.database or settings.DB_NAME
         
         # Conectar al servidor MySQL sin base de datos para crearla si no existe
-        server_url = url.set(database=None)
+        server_url = url.set(database="")
         
         print(f"[*] Conectando al servidor MySQL en {url.host}:{url.port} (usuario: '{url.username}')...")
         try:

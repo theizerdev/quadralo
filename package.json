@@ -6,8 +6,8 @@
   "scripts": {
     "dev": "python dev.py",
     "dev:concurrent": "concurrently -k -n \"BACKEND,FRONTEND\" -c \"blue.bold,green.bold\" \"npm run dev:backend\" \"npm run dev:frontend\"",
-    "dev:backend": "cd backend && (venv\\Scripts\\python -m uvicorn app.main:app --reload --port 8000 || venv/bin/python -m uvicorn app.main:app --reload --port 8000)",
-    "dev:frontend": "cd frontend && npm run dev",
+    "dev:backend": "cd backend && (venv\\Scripts\\python -m uvicorn app.main:app --reload --port 8001 || venv/bin/python -m uvicorn app.main:app --reload --port 8001)",
+    "dev:frontend": "cd frontend && npm run dev -- -p 3001",
     "init:db": "python dev.py --init-db",
     "seed": "python dev.py --seed",
     "setup": "npm run install:all && npm run init:db",

@@ -8,14 +8,14 @@ GREEN='\033[0;32m'
 BOLD='\033[1m'
 NC='\033[0m'
 
-clear
+clear 2>/dev/null || true
 echo -e "${CYAN}${BOLD}================================================================${NC}"
 echo -e "${GREEN}${BOLD}         🚀 QUÁDRALO - INICIANDO SISTEMA COMPLETO 🚀           ${NC}"
 echo -e "${CYAN}                 Tus finanzas siempre al día                    ${NC}"
 echo -e "${CYAN}${BOLD}================================================================${NC}"
 echo ""
-echo -e "  [1/2] Backend:  FastAPI en ${BOLD}http://127.0.0.1:8000${NC}"
-echo -e "  [2/2] Frontend: Next.js en ${BOLD}http://localhost:3000${NC}"
+echo -e "  [1/2] Backend:  FastAPI en ${BOLD}http://127.0.0.1:8001${NC}"
+echo -e "  [2/2] Frontend: Next.js en ${BOLD}http://localhost:3001${NC}"
 echo ""
 echo -e "Presiona ${BOLD}Ctrl + C${NC} en cualquier momento para detener los servicios."
 echo -e "${CYAN}----------------------------------------------------------------${NC}"
