@@ -20,3 +20,11 @@ class SMTPSettings(Base):
     use_ssl = Column(Boolean, default=False, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    @property
+    def from_name(self) -> str:
+        return self.sender_name
+
+    @property
+    def from_email(self) -> str:
+        return self.smtp_user

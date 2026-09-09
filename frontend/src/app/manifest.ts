@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "Quádralo - Finanzas e Inversiones",
     short_name: "Quádralo",
     description: "Tus finanzas siempre al día. Gestión de inversiones, ventas y márgenes en tiempo real.",
-    start_url: "/dashboard",
+    start_url: "/",
     display: "standalone",
     background_color: "#090D16",
     theme_color: "#10B981",

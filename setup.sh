@@ -11,7 +11,7 @@ RED='\033[0;31m'
 BOLD='\033[1m'
 NC='\033[0m' # No Color
 
-clear
+clear 2>/dev/null || true
 
 echo -e "${CYAN}${BOLD}================================================================${NC}"
 echo -e "${GREEN}${BOLD}      🚀 QUÁDRALO - INSTALADOR Y CONFIGURADOR AUTOMÁTICO 🚀     ${NC}"
@@ -20,7 +20,7 @@ echo -e "${CYAN}${BOLD}=========================================================
 echo ""
 
 # 1. Verificar Python 3 y venv
-echo -e "${BOLD}[*] [1/5] Verificando entorno de Python 3...${NC}"
+echo -e "${BOLD}[*] [1/6] Verificando entorno de Python 3...${NC}"
 if ! command -v python3 &> /dev/null; then
     echo -e "${RED}[!] ERROR: Python 3 no está instalado.${NC}"
     echo -e "    Instálalo ejecutando: ${YELLOW}sudo apt update && sudo apt install -y python3 python3-venv python3-pip${NC}"
@@ -39,10 +39,10 @@ fi
 
 # 2. Verificar Node.js y npm
 echo ""
-echo -e "${BOLD}[*] [2/5] Verificando instalación de Node.js y npm...${NC}"
+echo -e "${BOLD}[*] [2/6] Verificando instalación de Node.js y npm...${NC}"
 if ! command -v node &> /dev/null; then
     echo -e "${RED}[!] ERROR: Node.js no está instalado.${NC}"
-    echo -e "    Puedes instalarlo usando NodeSource (v20 LTS):"
+    echo -e "    Puedes instalarlo usando NodeSource (v20 o superior LTS):"
     echo -e "    ${YELLOW}curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -${NC}"
     echo -e "    ${YELLOW}sudo apt install -y nodejs${NC}"
     exit 1
@@ -62,15 +62,14 @@ echo -e "    ${GREEN}[OK] npm:${NC}     v$NPM_VERSION"
 
 # 3. Configurar archivos de entorno (.env)
 echo ""
-echo -e "${BOLD}[*] [3/5] Configurando archivos de variables de entorno (.env)...${NC}"
+echo -e "${BOLD}[*] [3/6] Configurando variables de entorno (.env)...${NC}"
 if [ ! -f "backend/.env" ]; then
     if [ -f "backend/.env.example" ]; then
         cp backend/.env.example backend/.env
         echo -e "    ${GREEN}[OK]${NC} Archivo backend/.env creado desde .env.example"
         
-        # En Debian/Linux estándar, MySQL/MariaDB suele usar el puerto 3306 (a diferencia del 3307 de Laragon)
-        # Si el puerto 3306 está abierto localmente y 3307 no, ajustar automáticamente a 3306:
-        if ! nc -z 127.0.0.1 3307 2>/dev/null && nc -z 127.0.0.1 3306 2>/dev/null; then
+        # En Linux/Debian estándar, MySQL/MariaDB suele usar el puerto 3306
+        if nc -z 127.0.0.1 3306 2>/dev/null; then
             sed -i 's/DB_PORT=3307/DB_PORT=3306/g' backend/.env
             sed -i 's/:3307\//:3306\//g' backend/.env
             echo -e "    ${YELLOW}[i] Puerto de MySQL ajustado a 3306 (estándar en Debian/Ubuntu)${NC}"
@@ -91,7 +90,7 @@ fi
 
 # 4. Entorno virtual de Python y dependencias
 echo ""
-echo -e "${BOLD}[*] [4/5] Configurando Backend (Python venv y dependencias)...${NC}"
+echo -e "${BOLD}[*] [4/6] Configurando Backend (Python venv y dependencias)...${NC}"
 if [ ! -d "backend/venv" ]; then
     echo -e "    [*] Creando entorno virtual en backend/venv..."
     python3 -m venv backend/venv
@@ -107,7 +106,7 @@ echo -e "    ${GREEN}[OK]${NC} Dependencias de Python instaladas exitosamente."
 
 # 5. Inicializar Base de Datos MySQL y Tablas
 echo ""
-echo -e "${BOLD}[*] [5/5] Inicializando Base de Datos MySQL y Tablas del Sistema...${NC}"
+echo -e "${BOLD}[*] [5/6] Inicializando Base de Datos MySQL y Tablas del Sistema...${NC}"
 backend/venv/bin/python backend/init_db.py
 DB_STATUS=$?
 if [ $DB_STATUS -ne 0 ]; then
@@ -118,12 +117,23 @@ if [ $DB_STATUS -ne 0 ]; then
     echo -e "    Y verifica usuario/contraseña en el archivo ${CYAN}backend/.env${NC}"
 fi
 
-# 6. Dependencias Frontend y Raíz
+# 6. Dependencias Frontend y Compilación
 echo ""
-echo -e "${BOLD}[*] Instalando dependencias de Node.js (Frontend y Raíz)...${NC}"
+echo -e "${BOLD}[*] [6/6] Instalando dependencias y compilando Frontend Next.js...${NC}"
 npm install
-cd frontend && npm install && cd ..
-echo -e "    ${GREEN}[OK]${NC} Dependencias de Frontend instaladas exitosamente."
+cd frontend && npm install
+echo -e "    ${GREEN}[OK]${NC} Dependencias de Node.js instaladas."
+
+echo -e "    [*] Compilando aplicación Next.js para producción..."
+npm run build
+BUILD_STATUS=$?
+cd ..
+
+if [ $BUILD_STATUS -eq 0 ]; then
+    echo -e "    ${GREEN}[OK]${NC} Build de Next.js generado exitosamente."
+else
+    echo -e "    ${RED}[!] AVISO: Error durante el build de Next.js. Revisa los logs anteriores.${NC}"
+fi
 
 # Hacer ejecutables los scripts bash
 chmod +x setup.sh 2>/dev/null || true
@@ -136,11 +146,14 @@ echo -e "${CYAN}${BOLD}=========================================================
 echo -e "${GREEN}${BOLD}     🎉 ¡INSTALACIÓN Y CONFIGURACIÓN COMPLETADA CON ÉXITO! 🎉   ${NC}"
 echo -e "${CYAN}${BOLD}================================================================${NC}"
 echo ""
-echo -e "Para iniciar el sistema Quádralo puedes ejecutar:"
-echo -e "  ${YELLOW}./start.sh${NC}        o  ${YELLOW}python3 dev.py${NC}  o  ${YELLOW}npm run dev${NC}"
+echo -e "Modos de ejecución disponibles:"
+echo -e "  1. ${YELLOW}Producción (Nginx / SSL / Systemd):${NC}"
+echo -e "     URL Pública:         ${BOLD}https://quadralo.theizerdev.com/${NC}"
+echo -e "     Documentación API:   ${BOLD}https://quadralo.theizerdev.com/docs${NC}"
 echo ""
-echo -e "  * Frontend disponible en: ${BOLD}http://localhost:3000${NC}"
-echo -e "  * Backend disponible en:  ${BOLD}http://127.0.0.1:8000${NC}"
-echo -e "  * Documentación API en:   ${BOLD}http://127.0.0.1:8000/docs${NC}"
+echo -e "  2. ${YELLOW}Desarrollo Local:${NC}"
+echo -e "     ${YELLOW}./start.sh${NC}  o  ${YELLOW}python3 dev.py${NC}  o  ${YELLOW}npm run dev${NC}"
+echo -e "     * Frontend: ${BOLD}http://localhost:3001${NC}"
+echo -e "     * Backend:  ${BOLD}http://127.0.0.1:8001${NC}"
 echo -e "${CYAN}================================================================${NC}"
 echo ""

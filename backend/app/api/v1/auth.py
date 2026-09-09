@@ -45,13 +45,19 @@ def send_welcome_and_verification_email(db: Session, user: User, code: str) -> b
 
     try:
         msg = MIMEMultipart("alternative")
-        sender_name = smtp_config.from_name or "Quádralo"
-        msg["From"] = f"{sender_name} <{smtp_config.from_email or smtp_config.smtp_user}>"
+        sender_name = getattr(smtp_config, "sender_name", None) or getattr(smtp_config, "from_name", "Quádralo")
+        sender_email = getattr(smtp_config, "smtp_user", None) or getattr(smtp_config, "from_email", None)
+        if not sender_email:
+            return False
+
+        msg["From"] = f"{sender_name} <{sender_email}>"
         msg["To"] = user.email
         msg["Subject"] = f"🚀 ¡Bienvenido a Quádralo! Activa tu cuenta con la clave: {code}"
 
-        encoded_business = user.business_name.replace(" ", "%20")
-        encoded_user = user.full_name.replace(" ", "%20")
+        business_val = user.business_name or "Mi Negocio"
+        user_val = user.full_name or "Usuario"
+        encoded_business = business_val.replace(" ", "%20")
+        encoded_user = user_val.replace(" ", "%20")
 
         html_body = f"""
         <!DOCTYPE html>
@@ -112,7 +118,7 @@ def send_welcome_and_verification_email(db: Session, user: User, code: str) -> b
                 </a>
 
                 <div class="channel-item" style="border-left: 4px solid #0284c7;">
-                  <span>✉️ <strong>Correo de Atención:</strong> {smtp_config.from_email or 'theizerdev@gmail.com'}</span>
+                  <span>✉️ <strong>Correo de Atención:</strong> {smtp_config.smtp_user or 'theizerdev@gmail.com'}</span>
                 </div>
               </div>
 
@@ -141,7 +147,9 @@ def send_welcome_and_verification_email(db: Session, user: User, code: str) -> b
         server.quit()
         return True
     except Exception as e:
+        import traceback
         print(f"[!] Error enviando correo de bienvenida/verificación: {e}")
+        traceback.print_exc()
         return False
 
 @router.post("/register", response_model=RegisterResponse, status_code=status.HTTP_201_CREATED)
@@ -312,8 +320,15 @@ def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)):
     if smtp_config and smtp_config.is_active and smtp_config.smtp_password:
         try:
             msg = MIMEMultipart("alternative")
-            sender_name = smtp_config.from_name or "Quádralo"
-            msg["From"] = f"{sender_name} <{smtp_config.from_email or smtp_config.smtp_user}>"
+            sender_name = getattr(smtp_config, "sender_name", None) or getattr(smtp_config, "from_name", "Quádralo")
+            sender_email = getattr(smtp_config, "smtp_user", None) or getattr(smtp_config, "from_email", None)
+            if not sender_email:
+                return MessageResponse(
+                    message=f"Si el correo {req.email} está registrado, recibirás un enlace de recuperación.",
+                    success=True
+                )
+
+            msg["From"] = f"{sender_name} <{sender_email}>"
             msg["To"] = user.email
             msg["Subject"] = f"🔐 Código de Recuperación de Contraseña ({code_str})"
 
@@ -374,7 +389,10 @@ def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)):
             server.quit()
             email_sent = True
         except Exception as e:
-            print(f"[!] Error al enviar correo SMTP de recuperación: {e}")
+            import traceback
+            print(f"[!] Error enviando correo de recuperación: {e}")
+            traceback.print_exc()
+            email_sent = False
 
     return MessageResponse(
         message=f"Hemos enviado un código de 8 dígitos a {req.email}. Revisa tu bandeja de entrada.",

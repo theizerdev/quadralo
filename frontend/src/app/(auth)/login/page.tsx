@@ -37,6 +37,11 @@ export default function LoginPage() {
 
   return (
     <div className="space-y-6">
+      <title>Iniciar Sesión | Quádralo</title>
+      <meta
+        name="description"
+        content="Inicia sesión en Quádralo para gestionar tus ventas, inversiones y márgenes de ganancia con tasa BCV en tiempo real."
+      />
       {/* Título de Bienvenida */}
       <div className="space-y-2 text-left">
         <div className="hidden lg:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">

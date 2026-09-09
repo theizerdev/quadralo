@@ -30,24 +30,29 @@ def main():
         res = subprocess.run([python_exec, seed_script], cwd=backend_dir)
         sys.exit(res.returncode)
 
+    backend_port = os.getenv("BACKEND_PORT", "8001")
+    frontend_port = os.getenv("FRONTEND_PORT", "3001")
+
     print("\n" + "="*55)
     print("      QUÁDRALO - Servidor Fullstack Iniciado")
     print("="*55)
-    print("  * Backend FastAPI:  http://127.0.0.1:8000")
-    print("  * Frontend Next.js: http://localhost:3000")
-    print("  * Documentación API: http://127.0.0.1:8000/docs")
+    print(f"  * Backend FastAPI:  http://127.0.0.1:{backend_port}")
+    print(f"  * Frontend Next.js: http://localhost:{frontend_port}")
+    print(f"  * Documentación API: http://127.0.0.1:{backend_port}/docs")
     print("="*55)
     print("Presiona Ctrl + C para detener ambos servidores.\n")
 
-    backend_cmd = [python_exec, "-m", "uvicorn", "app.main:app", "--reload", "--port", "8000"]
-    frontend_cmd = ["npm.cmd", "run", "dev"] if sys.platform == "win32" else ["npm", "run", "dev"]
+    backend_cmd = [python_exec, "-m", "uvicorn", "app.main:app", "--reload", "--port", str(backend_port)]
+    frontend_env = os.environ.copy()
+    frontend_env["PORT"] = str(frontend_port)
+    frontend_cmd = ["npm.cmd", "run", "dev", "--", "-p", str(frontend_port)] if sys.platform == "win32" else ["npm", "run", "dev", "--", "-p", str(frontend_port)]
 
     processes = []
     try:
         p_backend = subprocess.Popen(backend_cmd, cwd=backend_dir)
         processes.append(p_backend)
 
-        p_frontend = subprocess.Popen(frontend_cmd, cwd=frontend_dir)
+        p_frontend = subprocess.Popen(frontend_cmd, cwd=frontend_dir, env=frontend_env)
         processes.append(p_frontend)
 
         for p in processes:
