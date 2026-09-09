@@ -45,38 +45,42 @@ import {
 
 interface CustomerSummaryItem {
   id: string;
-  user_id: string;
+  user_id?: string;
   name: string;
   phone?: string | null;
   email?: string | null;
   address?: string | null;
   notes?: string | null;
   created_at: string;
-  total_purchases_count: number;
-  total_spent_usd: number;
-  total_spent_ves: number;
-  total_paid_usd: number;
-  total_debt_usd: number;
-  total_debt_ves: number;
-  has_debt: boolean;
+  total_purchases_count?: number;
+  total_spent_usd?: number;
+  total_spent_ves?: number;
+  total_paid_usd?: number;
+  total_debt_usd?: number;
+  total_debt_ves?: number;
+  has_debt?: boolean;
   last_sale_date?: string | null;
+  last_purchase_date?: string | null;
+  payment_status?: string;
 }
 
 interface CustomersSummaryKPIs {
-  total_customers: number;
-  debtors_count: number;
-  up_to_date_count: number;
-  total_receivable_usd: number;
-  total_receivable_ves: number;
-  total_collected_usd: number;
-  total_collected_ves: number;
-  collection_rate_percent: number;
-  current_bcv_rate: number;
+  total_customers?: number;
+  debtors_count?: number;
+  up_to_date_count?: number;
+  total_receivable_usd?: number;
+  total_receivable_ves?: number;
+  total_collected_usd?: number;
+  total_collected_ves?: number;
+  collection_rate_percent?: number;
+  current_bcv_rate?: number;
+  average_ticket_usd?: number;
 }
 
 interface CustomerListResponse {
-  items: CustomerSummaryItem[];
-  kpis: CustomersSummaryKPIs;
+  items?: CustomerSummaryItem[];
+  customers?: CustomerSummaryItem[];
+  kpis?: CustomersSummaryKPIs;
 }
 
 interface SalePayment {
@@ -155,7 +159,7 @@ export default function ClientesPage() {
     try {
       setLoading(true);
       const res = await apiFetch<CustomerListResponse>(
-        `/customers?filter_debt=${tabFilter}&search=${encodeURIComponent(searchQuery)}`
+        `/customers?filter_debt=${tabFilter}&status_filter=${tabFilter}&search=${encodeURIComponent(searchQuery)}`
       );
       setData(res);
     } catch (err: any) {
@@ -398,7 +402,7 @@ export default function ClientesPage() {
   };
 
   const kpis = data?.kpis;
-  const customers = data?.items || [];
+  const customers = data?.customers || data?.items || [];
 
   return (
     <div className="space-y-6 pb-12">
@@ -478,8 +482,8 @@ export default function ClientesPage() {
               {kpis?.debtors_count ?? 0}
             </span>
             <span className="text-xs text-amber-600/80 dark:text-amber-400/80">
-              {kpis && kpis.total_customers > 0
-                ? `${Math.round((kpis.debtors_count / kpis.total_customers) * 100)}% de tu cartera`
+              {kpis && (kpis.total_customers ?? 0) > 0
+                ? `${Math.round(((kpis.debtors_count ?? 0) / (kpis.total_customers || 1)) * 100)}% de tu cartera`
                 : "0%"}
             </span>
           </div>
@@ -499,14 +503,14 @@ export default function ClientesPage() {
           </div>
           <div className="mt-2">
             <span className="text-2xl font-bold text-rose-600 dark:text-rose-400">
-              ${kpis ? kpis.total_receivable_usd.toFixed(2) : "0.00"}
+              ${(kpis?.total_receivable_usd ?? 0).toFixed(2)}
             </span>
             <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400">
-              ≈ Bs. {kpis ? kpis.total_receivable_ves.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0,00"}
+              ≈ Bs. {(kpis?.total_receivable_ves ?? 0).toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </p>
           </div>
           <p className="mt-1 text-[11px] text-neutral-400">
-            Tasa BCV ref: {kpis?.current_bcv_rate?.toFixed(2) || "36.00"} Bs/$
+            Tasa BCV ref: {(kpis?.current_bcv_rate ?? 36).toFixed(2)} Bs/$
           </p>
         </div>
 
@@ -521,12 +525,12 @@ export default function ClientesPage() {
           </div>
           <div className="mt-2 flex items-baseline gap-2">
             <span className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
-              {kpis ? `${kpis.collection_rate_percent.toFixed(1)}%` : "100%"}
+              {(kpis?.collection_rate_percent ?? 100).toFixed(1)}%
             </span>
             <span className="text-xs text-neutral-400">recaudado</span>
           </div>
           <p className="mt-1 text-[11px] text-neutral-500">
-            Cobrado: ${kpis ? kpis.total_collected_usd.toFixed(2) : "0.00"}
+            Cobrado: ${(kpis?.total_collected_usd ?? 0).toFixed(2)}
           </p>
         </div>
       </div>
@@ -623,7 +627,7 @@ export default function ClientesPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {customers.map((c) => {
-            const hasDebt = c.total_debt_usd > 0.01;
+            const hasDebt = (c.total_debt_usd ?? 0) > 0.01;
             return (
               <div
                 key={c.id}
@@ -664,7 +668,7 @@ export default function ClientesPage() {
                     {/* STATUS BADGE */}
                     {hasDebt ? (
                       <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-100 text-rose-700 dark:bg-rose-950/80 dark:text-rose-300 border border-rose-200 dark:border-rose-900 shrink-0">
-                        Debe ${c.total_debt_usd.toFixed(2)}
+                        Debe ${(c.total_debt_usd ?? 0).toFixed(2)}
                       </span>
                     ) : (
                       <span className="px-2.5 py-1 rounded-full text-[11px] font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900 shrink-0">
@@ -702,18 +706,18 @@ export default function ClientesPage() {
                     <div>
                       <span className="block text-[10px] text-neutral-400 font-medium uppercase">Comprado</span>
                       <span className="text-xs font-bold text-neutral-800 dark:text-neutral-200">
-                        ${c.total_spent_usd.toFixed(2)}
+                        ${(c.total_spent_usd ?? 0).toFixed(2)}
                       </span>
                       <span className="block text-[10px] text-neutral-400">{c.total_purchases_count} compras</span>
                     </div>
                     <div>
                       <span className="block text-[10px] text-neutral-400 font-medium uppercase">Pagado</span>
                       <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                        ${c.total_paid_usd.toFixed(2)}
+                        ${(c.total_paid_usd ?? 0).toFixed(2)}
                       </span>
                       <span className="block text-[10px] text-neutral-400">
-                        {c.total_spent_usd > 0
-                          ? `${Math.round((c.total_paid_usd / c.total_spent_usd) * 100)}%`
+                        {(c.total_spent_usd ?? 0) > 0
+                          ? `${Math.round(((c.total_paid_usd ?? 0) / (c.total_spent_usd || 1)) * 100)}%`
                           : "100%"}
                       </span>
                     </div>
@@ -724,11 +728,11 @@ export default function ClientesPage() {
                           hasDebt ? "text-rose-600 dark:text-rose-400" : "text-neutral-500"
                         }`}
                       >
-                        ${c.total_debt_usd.toFixed(2)}
+                        ${(c.total_debt_usd ?? 0).toFixed(2)}
                       </span>
                       {hasDebt && (
                         <span className="block text-[10px] text-rose-500/80 truncate">
-                          ≈ Bs. {c.total_debt_ves.toFixed(0)}
+                          ≈ Bs. {(c.total_debt_ves ?? 0).toFixed(0)}
                         </span>
                       )}
                     </div>
@@ -1007,7 +1011,7 @@ export default function ClientesPage() {
             </DialogTitle>
             <DialogDescription className="text-xs">
               ¿Estás seguro de que deseas eliminar a <strong>{selectedCustomer?.name}</strong>?
-              {selectedCustomer && selectedCustomer.total_purchases_count > 0 && (
+              {selectedCustomer && (selectedCustomer.total_purchases_count ?? 0) > 0 && (
                 <span className="block mt-1 text-neutral-500">
                   Sus {selectedCustomer.total_purchases_count} ventas históricas permanecerán intactas en tus registros.
                 </span>
@@ -1179,7 +1183,7 @@ export default function ClientesPage() {
                 />
                 {kpis && abonoAmountUsd && !isNaN(parseFloat(abonoAmountUsd)) && (
                   <p className="text-[11px] text-neutral-400 mt-1">
-                    Equivalente en Bolívares: Bs. {(parseFloat(abonoAmountUsd) * kpis.current_bcv_rate).toFixed(2)} (Tasa {kpis.current_bcv_rate.toFixed(2)})
+                    Equivalente en Bolívares: Bs. {(parseFloat(abonoAmountUsd) * (kpis.current_bcv_rate ?? 0)).toFixed(2)} (Tasa {(kpis.current_bcv_rate ?? 0).toFixed(2)})
                   </p>
                 )}
               </div>
