@@ -6,12 +6,14 @@ from sqlalchemy.orm import Session
 from app.db.database import get_db
 from app.models.user import User
 from app.models.investment import Investment
-from app.models.sale import Sale
+from app.models.sale import Sale, SalePayment
 from app.schemas.sale import (
     SaleCreate,
     SaleUpdate,
     SaleResponse,
     SaleSummary,
+    SalePaymentCreate,
+    SalePaymentResponse,
     SalesAnalyticsResponse,
     SalesAnalyticsSummary,
     TimelinePoint,
@@ -26,14 +28,32 @@ router = APIRouter()
 
 @router.get("/", response_model=List[SaleResponse])
 def get_user_sales(
+    category: Optional[str] = None,
+    payment_status: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Listar todas las ventas registradas del usuario autenticado o todas si es SuperAdmin."""
+    """Listar todas las ventas registradas del usuario autenticado con filtros opcionales."""
     query = db.query(Sale)
     if not (current_user.is_superuser or current_user.role == "superadmin"):
         query = query.filter(Sale.user_id == current_user.id)
+    if category and category.strip() and category.strip().lower() != "todas":
+        query = query.filter(Sale.category.ilike(category.strip()))
+    if payment_status and payment_status.strip() and payment_status.strip().lower() != "all":
+        query = query.filter(Sale.payment_status == payment_status.strip().lower())
     return query.order_by(Sale.created_at.desc()).all()
+
+@router.get("/categories", response_model=List[str])
+def get_sales_categories(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Obtener la lista única de categorías de ventas registradas por el usuario."""
+    query = db.query(Sale.category).filter(Sale.user_id == current_user.id).distinct()
+    categories = [c[0] for c in query.all() if c[0]]
+    if not categories:
+        categories = ["General"]
+    return sorted(list(set(categories)))
 
 @router.post("/", response_model=SaleResponse, status_code=status.HTTP_201_CREATED)
 def create_sale(
@@ -110,10 +130,53 @@ def create_sale(
     else:
         profit_margin_percent = 100.0
 
+    # Determinar categoría (heredada de la inversión o personalizada)
+    category = sale_in.category.strip() if (sale_in.category and sale_in.category.strip()) else None
+    if not category:
+        if target_investment and target_investment.category:
+            category = target_investment.category
+        else:
+            category = "General"
+
+    # Determinar estado de pago y saldo deudor
+    payment_status = (sale_in.payment_status or "paid").lower()
+    if payment_status not in ["paid", "partial", "pending"]:
+        payment_status = "paid"
+
+    if payment_status == "paid":
+        paid_amount_usd = total_income_usd
+        paid_amount_ves = total_income_ves
+        debt_amount_usd = 0.0
+        debt_amount_ves = 0.0
+    elif payment_status == "pending":
+        paid_amount_usd = 0.0
+        paid_amount_ves = 0.0
+        debt_amount_usd = total_income_usd
+        debt_amount_ves = total_income_ves
+    elif payment_status == "partial":
+        if sale_in.initial_payment_usd is not None and sale_in.initial_payment_usd > 0:
+            paid_amount_usd = round(min(total_income_usd, sale_in.initial_payment_usd), 2)
+            paid_amount_ves = round(paid_amount_usd * sale_in.bcv_rate, 2)
+        elif sale_in.initial_payment_ves is not None and sale_in.initial_payment_ves > 0:
+            paid_amount_ves = round(min(total_income_ves, sale_in.initial_payment_ves), 2)
+            paid_amount_usd = round(paid_amount_ves / sale_in.bcv_rate, 2)
+        else:
+            paid_amount_usd = 0.0
+            paid_amount_ves = 0.0
+        
+        debt_amount_usd = round(max(0.0, total_income_usd - paid_amount_usd), 2)
+        debt_amount_ves = round(max(0.0, total_income_ves - paid_amount_ves), 2)
+
+        if debt_amount_usd <= 0.01:
+            payment_status = "paid"
+            debt_amount_usd = 0.0
+            debt_amount_ves = 0.0
+
     new_sale = Sale(
         user_id=current_user.id,
         investment_id=sale_in.investment_id,
         product_name=sale_in.product_name,
+        category=category,
         quantity=sale_in.quantity,
         unit_cost_usd=unit_cost_usd,
         unit_price_usd=unit_price_usd,
@@ -127,11 +190,31 @@ def create_sale(
         net_profit_ves=net_profit_ves,
         profit_margin_percent=profit_margin_percent,
         payment_method=sale_in.payment_method or "Pago Móvil",
+        payment_status=payment_status,
+        paid_amount_usd=paid_amount_usd,
+        paid_amount_ves=paid_amount_ves,
+        debt_amount_usd=debt_amount_usd,
+        debt_amount_ves=debt_amount_ves,
+        due_date=sale_in.due_date,
         customer_name=sale_in.customer_name,
         notes=sale_in.notes
     )
 
     db.add(new_sale)
+    db.flush()
+
+    # Si hubo desembolso inicial, registrar comprobante de abono / pago
+    if paid_amount_usd > 0:
+        initial_payment = SalePayment(
+            sale_id=new_sale.id,
+            amount_usd=paid_amount_usd,
+            amount_ves=paid_amount_ves,
+            bcv_rate=sale_in.bcv_rate,
+            payment_method=sale_in.payment_method or "Pago Móvil",
+            notes="Pago al contado" if payment_status == "paid" else "Abono inicial",
+        )
+        db.add(initial_payment)
+
     db.commit()
     db.refresh(new_sale)
     return new_sale
@@ -141,7 +224,7 @@ def get_sales_summary(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Obtener métricas acumuladas de ventas y rentabilidad del usuario."""
+    """Obtener métricas acumuladas de ventas, rentabilidad y cuentas por cobrar del usuario."""
     sales = (
         db.query(Sale)
         .filter(Sale.user_id == current_user.id)
@@ -156,6 +239,11 @@ def get_sales_summary(
     total_profit_ves = sum(s.net_profit_ves for s in sales)
     total_items_sold = sum(s.quantity for s in sales)
     
+    total_debt_usd = sum(s.debt_amount_usd for s in sales)
+    total_debt_ves = sum(s.debt_amount_ves for s in sales)
+    pending_sales_count = sum(1 for s in sales if s.debt_amount_usd > 0.01)
+    paid_sales_count = sum(1 for s in sales if s.debt_amount_usd <= 0.01)
+
     if total_cost_usd > 0:
         average_margin_percent = round((total_profit_usd / total_cost_usd) * 100, 2)
     elif total_income_usd > 0:
@@ -175,7 +263,11 @@ def get_sales_summary(
         average_margin_percent=average_margin_percent,
         total_items_sold=total_items_sold,
         sales_count=len(sales),
-        current_bcv_rate=current_rate
+        current_bcv_rate=current_rate,
+        total_debt_usd=round(total_debt_usd, 2),
+        total_debt_ves=round(total_debt_ves, 2),
+        pending_sales_count=pending_sales_count,
+        paid_sales_count=paid_sales_count,
     )
 
 @router.get("/analytics", response_model=SalesAnalyticsResponse)
@@ -506,6 +598,8 @@ def update_sale(
 
     if sale_in.product_name is not None:
         sale.product_name = sale_in.product_name
+    if sale_in.category is not None and sale_in.category.strip():
+        sale.category = sale_in.category.strip()
     if sale_in.investment_id is not None:
         sale.investment_id = sale_in.investment_id
     if sale_in.quantity is not None:
@@ -520,6 +614,8 @@ def update_sale(
         sale.customer_name = sale_in.customer_name
     if sale_in.notes is not None:
         sale.notes = sale_in.notes
+    if sale_in.due_date is not None:
+        sale.due_date = sale_in.due_date
 
     # Precios
     if sale_in.unit_price_usd is not None:
@@ -541,6 +637,96 @@ def update_sale(
         sale.profit_margin_percent = round((sale.net_profit_usd / sale.total_cost_usd) * 100, 2)
     else:
         sale.profit_margin_percent = 100.0
+
+    # Estado de pago
+    if sale_in.payment_status is not None:
+        new_status = sale_in.payment_status.lower()
+        if new_status == "paid":
+            sale.payment_status = "paid"
+            sale.paid_amount_usd = sale.total_income_usd
+            sale.paid_amount_ves = sale.total_income_ves
+            sale.debt_amount_usd = 0.0
+            sale.debt_amount_ves = 0.0
+        elif new_status == "pending":
+            sale.payment_status = "pending"
+            sale.paid_amount_usd = 0.0
+            sale.paid_amount_ves = 0.0
+            sale.debt_amount_usd = sale.total_income_usd
+            sale.debt_amount_ves = sale.total_income_ves
+        elif new_status == "partial":
+            sale.payment_status = "partial"
+    
+    # Recalcular saldo deudor si cambiaron los totales
+    if sale.payment_status != "paid":
+        sale.debt_amount_usd = round(max(0.0, sale.total_income_usd - sale.paid_amount_usd), 2)
+        sale.debt_amount_ves = round(max(0.0, sale.total_income_ves - sale.paid_amount_ves), 2)
+        if sale.debt_amount_usd <= 0.01:
+            sale.payment_status = "paid"
+            sale.debt_amount_usd = 0.0
+            sale.debt_amount_ves = 0.0
+
+    db.commit()
+    db.refresh(sale)
+    return sale
+
+@router.post("/{sale_id}/payments", response_model=SaleResponse)
+def add_sale_payment(
+    sale_id: str,
+    payment_in: SalePaymentCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Registrar un abono o cuota de pago a una venta con saldo pendiente."""
+    query = db.query(Sale).filter(Sale.id == sale_id)
+    if not (current_user.is_superuser or current_user.role == "superadmin"):
+        query = query.filter(Sale.user_id == current_user.id)
+    sale = query.first()
+    if not sale:
+        raise HTTPException(status_code=404, detail="Venta no encontrada")
+
+    if sale.debt_amount_usd <= 0.01:
+        raise HTTPException(status_code=400, detail="Esta venta ya se encuentra totalmente pagada.")
+
+    # Calcular monto del abono en USD y VES
+    if payment_in.amount_usd is not None and payment_in.amount_usd > 0:
+        abono_usd = round(payment_in.amount_usd, 2)
+        abono_ves = round(abono_usd * sale.bcv_rate, 2)
+    elif payment_in.amount_ves is not None and payment_in.amount_ves > 0:
+        abono_ves = round(payment_in.amount_ves, 2)
+        abono_usd = round(abono_ves / sale.bcv_rate, 2)
+    else:
+        raise HTTPException(status_code=400, detail="Debes especificar un monto a abonar mayor a 0.")
+
+    if abono_usd > round(sale.debt_amount_usd + 0.05, 2):
+        raise HTTPException(
+            status_code=400,
+            detail=f"El abono (${abono_usd}) no puede superar la deuda pendiente (${sale.debt_amount_usd})."
+        )
+
+    abono_usd = min(abono_usd, sale.debt_amount_usd)
+    abono_ves = round(abono_usd * sale.bcv_rate, 2)
+
+    new_payment = SalePayment(
+        sale_id=sale.id,
+        amount_usd=abono_usd,
+        amount_ves=abono_ves,
+        bcv_rate=sale.bcv_rate,
+        payment_method=payment_in.payment_method or "Pago Móvil",
+        notes=payment_in.notes
+    )
+    db.add(new_payment)
+
+    sale.paid_amount_usd = round(sale.paid_amount_usd + abono_usd, 2)
+    sale.paid_amount_ves = round(sale.paid_amount_ves + abono_ves, 2)
+    sale.debt_amount_usd = round(max(0.0, sale.total_income_usd - sale.paid_amount_usd), 2)
+    sale.debt_amount_ves = round(max(0.0, sale.total_income_ves - sale.paid_amount_ves), 2)
+
+    if sale.debt_amount_usd <= 0.01:
+        sale.payment_status = "paid"
+        sale.debt_amount_usd = 0.0
+        sale.debt_amount_ves = 0.0
+    else:
+        sale.payment_status = "partial"
 
     db.commit()
     db.refresh(sale)

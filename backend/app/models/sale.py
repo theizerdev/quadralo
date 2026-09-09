@@ -15,6 +15,7 @@ class Sale(Base):
     investment_id = Column(String(36), ForeignKey("investments.id"), nullable=True, index=True)
 
     product_name = Column(String(255), nullable=False)
+    category = Column(String(100), nullable=False, default="General", index=True)
     quantity = Column(Integer, nullable=False, default=1)
     
     # Costos base
@@ -36,8 +37,15 @@ class Sale(Base):
     net_profit_ves = Column(Float, nullable=False)                  # total_income_ves - total_cost_ves
     profit_margin_percent = Column(Float, nullable=False)           # (net_profit_usd / total_cost_usd) * 100
     
-    # Metadatos de la transacción
+    # Metadatos y Estado de Pago (Cuentas por Cobrar)
     payment_method = Column(String(100), nullable=False, default="Pago Móvil")
+    payment_status = Column(String(50), nullable=False, default="paid", index=True)  # paid, partial, pending
+    paid_amount_usd = Column(Float, nullable=False, default=0.0)
+    paid_amount_ves = Column(Float, nullable=False, default=0.0)
+    debt_amount_usd = Column(Float, nullable=False, default=0.0)
+    debt_amount_ves = Column(Float, nullable=False, default=0.0)
+    due_date = Column(DateTime, nullable=True)                      # Fecha límite de cobro para créditos
+
     customer_name = Column(String(255), nullable=True)
     notes = Column(Text, nullable=True)
 
@@ -45,3 +53,19 @@ class Sale(Base):
 
     user = relationship("User", backref="sales")
     investment = relationship("Investment", backref="sales")
+    payments = relationship("SalePayment", back_populates="sale", cascade="all, delete-orphan", order_by="SalePayment.created_at.asc()")
+
+
+class SalePayment(Base):
+    __tablename__ = "sale_payments"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid, index=True)
+    sale_id = Column(String(36), ForeignKey("sales.id", ondelete="CASCADE"), nullable=False, index=True)
+    amount_usd = Column(Float, nullable=False)
+    amount_ves = Column(Float, nullable=False)
+    bcv_rate = Column(Float, nullable=False)
+    payment_method = Column(String(100), nullable=False, default="Pago Móvil")
+    notes = Column(String(255), nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    sale = relationship("Sale", back_populates="payments")

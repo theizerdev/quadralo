@@ -39,13 +39,13 @@ export function NavUser() {
       <DropdownMenuTrigger asChild>
         <button
           className={cn(
-            "flex w-full items-center gap-2.5 rounded-lg p-1.5 text-left text-sm transition-colors hover:bg-neutral-200/60 dark:hover:bg-neutral-800/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900 dark:focus-visible:ring-neutral-300",
-            !isExpanded && "justify-center p-1"
+            "flex w-full items-center gap-2.5 rounded-xl p-2 text-left text-sm transition-all border border-neutral-200/80 bg-white dark:border-neutral-800 dark:bg-neutral-900/90 shadow-2xs hover:bg-neutral-50 dark:hover:bg-neutral-800/90 hover:border-neutral-300 dark:hover:border-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900 dark:focus-visible:ring-neutral-300 cursor-pointer",
+            !isExpanded && "justify-center p-1.5 border-transparent bg-transparent shadow-none hover:bg-neutral-200/60 dark:hover:bg-neutral-800/60"
           )}
         >
-          <div className="relative">
-            <Avatar className="size-8">
-              <AvatarFallback className={isSuperAdmin ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold" : ""}>
+          <div className="relative shrink-0">
+            <Avatar className="size-8 rounded-lg">
+              <AvatarFallback className={isSuperAdmin ? "bg-amber-500/15 text-amber-700 dark:text-amber-400 font-bold rounded-lg text-xs" : "rounded-lg text-xs font-semibold"}>
                 {initials}
               </AvatarFallback>
             </Avatar>
@@ -58,9 +58,9 @@ export function NavUser() {
 
           {isExpanded && (
             <>
-              <div className="grid flex-1 text-left text-xs leading-tight overflow-hidden">
+              <div className="grid flex-1 text-left text-xs leading-tight min-w-0 overflow-hidden">
                 <div className="flex items-center gap-1.5">
-                  <span className="truncate font-semibold text-neutral-900 dark:text-white">
+                  <span className="truncate font-bold text-neutral-900 dark:text-white">
                     {user.full_name}
                   </span>
                   {isSuperAdmin && (
@@ -71,7 +71,7 @@ export function NavUser() {
                   {user.email}
                 </span>
               </div>
-              <ChevronsUpDown className="ml-auto size-4 text-neutral-400 shrink-0" />
+              <ChevronsUpDown className="ml-auto size-3.5 text-neutral-400 shrink-0" />
             </>
           )}
         </button>

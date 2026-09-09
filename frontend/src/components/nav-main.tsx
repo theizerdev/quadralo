@@ -78,10 +78,10 @@ export function NavMain({
                     }
                   }}
                   className={cn(
-                    "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all group relative cursor-pointer text-left",
+                    "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all group relative cursor-pointer text-left",
                     isActive
-                      ? "bg-neutral-200/70 dark:bg-neutral-800/80 text-neutral-900 dark:text-white font-medium"
-                      : "text-neutral-600 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800/50 dark:hover:text-neutral-200",
+                      ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-950 font-semibold shadow-xs"
+                      : "text-neutral-600 hover:bg-neutral-200/60 dark:text-neutral-400 dark:hover:bg-neutral-800/60 dark:hover:text-neutral-100",
                     !isExpanded && "justify-center px-2"
                   )}
                   title={!isExpanded ? item.title : undefined}
@@ -90,8 +90,8 @@ export function NavMain({
                     className={cn(
                       "size-4 shrink-0 transition-transform group-hover:scale-105",
                       isActive
-                        ? "text-neutral-900 dark:text-white"
-                        : "text-neutral-500 dark:text-neutral-400"
+                        ? "text-white dark:text-neutral-950"
+                        : "text-neutral-500 dark:text-neutral-400 group-hover:text-neutral-900 dark:group-hover:text-neutral-200"
                     )}
                   />
 
@@ -104,7 +104,7 @@ export function NavMain({
                       className={cn(
                         "text-[10px] px-1.5 py-0.5 rounded font-medium",
                         isActive
-                          ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900"
+                          ? "bg-neutral-800 text-white dark:bg-neutral-200 dark:text-neutral-950"
                           : "bg-neutral-200/80 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400"
                       )}
                     >
@@ -168,10 +168,10 @@ export function NavMain({
               href={item.href}
               onClick={() => isMobile && setOpenMobile(false)}
               className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all group relative",
+                "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all group relative",
                 isActive
-                  ? "bg-neutral-200/70 dark:bg-neutral-800/80 text-neutral-900 dark:text-white font-medium shadow-2xs"
-                  : "text-neutral-600 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800/50 dark:hover:text-neutral-200",
+                  ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-950 font-semibold shadow-xs"
+                  : "text-neutral-600 hover:bg-neutral-200/60 dark:text-neutral-400 dark:hover:bg-neutral-800/60 dark:hover:text-neutral-100",
                 !isExpanded && "justify-center px-2"
               )}
               title={!isExpanded ? item.title : undefined}
@@ -180,8 +180,8 @@ export function NavMain({
                 className={cn(
                   "size-4 shrink-0 transition-transform group-hover:scale-105",
                   isActive
-                    ? "text-neutral-900 dark:text-white"
-                    : "text-neutral-500 dark:text-neutral-400"
+                    ? "text-white dark:text-neutral-950"
+                    : "text-neutral-500 dark:text-neutral-400 group-hover:text-neutral-900 dark:group-hover:text-neutral-200"
                 )}
               />
 
@@ -194,7 +194,7 @@ export function NavMain({
                   className={cn(
                     "text-[10px] px-1.5 py-0.5 rounded font-medium",
                     isActive
-                      ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900"
+                      ? "bg-neutral-800 text-white dark:bg-neutral-200 dark:text-neutral-950"
                       : "bg-neutral-200/80 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400"
                   )}
                 >

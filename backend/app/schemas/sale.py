@@ -1,10 +1,30 @@
 from datetime import datetime
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, List
+
+class SalePaymentCreate(BaseModel):
+    amount_usd: Optional[float] = Field(None, gt=0, description="Monto del abono en USD")
+    amount_ves: Optional[float] = Field(None, gt=0, description="Monto del abono en VES")
+    payment_method: str = Field(default="Pago Móvil", description="Método de pago del abono")
+    notes: Optional[str] = Field(None, description="Número de referencia o comprobante")
+
+class SalePaymentResponse(BaseModel):
+    id: str
+    sale_id: str
+    amount_usd: float
+    amount_ves: float
+    bcv_rate: float
+    payment_method: str
+    notes: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
 
 class SaleCreate(BaseModel):
     investment_id: Optional[str] = Field(None, description="ID del lote de inversión asociado (opcional)")
     product_name: str = Field(..., min_length=1, description="Nombre del producto vendido")
+    category: Optional[str] = Field(default="General", description="Categoría del producto")
     quantity: int = Field(..., gt=0, description="Cantidad de unidades vendidas")
     bcv_rate: float = Field(..., gt=0, description="Tasa BCV aplicada en la venta")
     
@@ -13,18 +33,26 @@ class SaleCreate(BaseModel):
     unit_price_ves: Optional[float] = Field(None, gt=0, description="Precio unitario de venta en VES")
     
     payment_method: str = Field(default="Pago Móvil", description="Método de pago utilizado")
+    payment_status: Optional[str] = Field(default="paid", description="Estado del pago: paid, partial, pending")
+    initial_payment_usd: Optional[float] = Field(None, ge=0, description="Abono inicial en USD si es parcial")
+    initial_payment_ves: Optional[float] = Field(None, ge=0, description="Abono inicial en VES si es parcial")
+    due_date: Optional[datetime] = Field(None, description="Fecha límite de cobro para ventas a crédito")
+
     customer_name: Optional[str] = Field(None, description="Nombre o identificación del cliente")
     notes: Optional[str] = Field(None, description="Observaciones o número de comprobante")
 
 class SaleUpdate(BaseModel):
     investment_id: Optional[str] = None
     product_name: Optional[str] = None
+    category: Optional[str] = None
     quantity: Optional[int] = Field(None, gt=0)
     bcv_rate: Optional[float] = Field(None, gt=0)
     unit_cost_usd: Optional[float] = Field(None, ge=0)
     unit_price_usd: Optional[float] = Field(None, gt=0)
     unit_price_ves: Optional[float] = Field(None, gt=0)
     payment_method: Optional[str] = None
+    payment_status: Optional[str] = None
+    due_date: Optional[datetime] = None
     customer_name: Optional[str] = None
     notes: Optional[str] = None
 
@@ -33,6 +61,7 @@ class SaleResponse(BaseModel):
     user_id: str
     investment_id: Optional[str] = None
     product_name: str
+    category: str = "General"
     quantity: int
     unit_cost_usd: float
     unit_price_usd: float
@@ -46,9 +75,16 @@ class SaleResponse(BaseModel):
     net_profit_ves: float
     profit_margin_percent: float
     payment_method: str
+    payment_status: str = "paid"
+    paid_amount_usd: float = 0.0
+    paid_amount_ves: float = 0.0
+    debt_amount_usd: float = 0.0
+    debt_amount_ves: float = 0.0
+    due_date: Optional[datetime] = None
     customer_name: Optional[str] = None
     notes: Optional[str] = None
     created_at: datetime
+    payments: List[SalePaymentResponse] = []
 
     class Config:
         from_attributes = True
@@ -64,6 +100,10 @@ class SaleSummary(BaseModel):
     total_items_sold: int
     sales_count: int
     current_bcv_rate: float
+    total_debt_usd: float = 0.0
+    total_debt_ves: float = 0.0
+    pending_sales_count: int = 0
+    paid_sales_count: int = 0
 
 class TimelinePoint(BaseModel):
     date: str

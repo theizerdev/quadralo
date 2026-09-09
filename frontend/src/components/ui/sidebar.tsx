@@ -98,7 +98,7 @@ export function SidebarProvider({
         setOpenMobile,
       }}
     >
-      <div className="flex min-h-screen w-full bg-neutral-50 dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 overflow-x-hidden">
+      <div className="flex min-h-screen w-full bg-neutral-50 dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100">
         {children}
       </div>
     </SidebarContext.Provider>
@@ -162,7 +162,7 @@ export function SidebarInset({
   return (
     <div
       className={cn(
-        "flex flex-1 flex-col min-w-0 w-full bg-white dark:bg-neutral-950 transition-[margin] duration-300 ease-in-out",
+        "flex flex-1 flex-col min-w-0 w-full bg-white dark:bg-neutral-950",
         className
       )}
     >
@@ -192,16 +192,25 @@ export function Sidebar({
         aria-hidden="true"
       />
 
-      {/* Barra Lateral / Drawer */}
+      {/* Espacio reservado en el flujo del layout para escritorio (Desktop placeholder) */}
+      <div
+        className={cn(
+          "hidden lg:block shrink-0 transition-all duration-300 ease-in-out",
+          open ? "w-64" : "w-16"
+        )}
+        aria-hidden="true"
+      />
+
+      {/* Barra Lateral / Drawer fijo al viewport */}
       <aside
         className={cn(
           // Estilo base
-          "bg-neutral-50 dark:bg-neutral-900/95 border-r border-neutral-200/80 dark:border-neutral-800 flex flex-col transition-all duration-300 ease-in-out",
+          "bg-neutral-50 dark:bg-neutral-900/95 border-r border-neutral-200/80 dark:border-neutral-800 flex flex-col transition-all duration-300 ease-in-out select-none",
           // Móvil & Tablet (< 1024px / < lg): Drawer off-canvas flotante
           "fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] shadow-2xl lg:shadow-none",
           openMobile ? "translate-x-0" : "-translate-x-full",
-          // Escritorio (>= 1024px / lg): Integrado en el flex flow
-          "lg:static lg:translate-x-0 lg:h-screen lg:sticky lg:top-0 lg:z-30",
+          // Escritorio (>= 1024px / lg): Fijo al viewport permanente, nunca se desplaza con el scroll
+          "lg:fixed lg:top-0 lg:bottom-0 lg:left-0 lg:translate-x-0 lg:h-screen lg:h-dvh lg:z-30",
           open ? "lg:w-64" : "lg:w-16",
           className
         )}

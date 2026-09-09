@@ -138,6 +138,56 @@ def create_tables():
                     conn.commit()
                     print("[OK] Columna 'initial_quantity' agregada y sincronizada exitosamente en la tabla 'investments'.")
 
+        if "sales" in tables:
+            columns_sales = [col["name"] for col in inspector.get_columns("sales")]
+            with engine.connect() as conn:
+                is_mysql = engine.url.get_backend_name() == "mysql"
+                if "category" not in columns_sales:
+                    print("[*] Aplicando actualizacion: agregando columna 'category' a la tabla 'sales'...")
+                    if is_mysql:
+                        conn.execute(text("ALTER TABLE sales ADD COLUMN category VARCHAR(100) NOT NULL DEFAULT 'General' AFTER product_name;"))
+                    else:
+                        conn.execute(text("ALTER TABLE sales ADD COLUMN category VARCHAR(100) NOT NULL DEFAULT 'General';"))
+                    conn.commit()
+                    # Sincronizar categorías de lotes ya vinculados
+                    try:
+                        if is_mysql:
+                            conn.execute(text("UPDATE sales s JOIN investments i ON s.investment_id = i.id SET s.category = i.category WHERE s.investment_id IS NOT NULL;"))
+                        else:
+                            conn.execute(text("UPDATE sales SET category = (SELECT category FROM investments WHERE investments.id = sales.investment_id) WHERE investment_id IS NOT NULL;"))
+                        conn.commit()
+                    except Exception as e:
+                        print(f"[*] Advertencia sincronizando categorias en ventas: {e}")
+                    print("[OK] Columna 'category' agregada y sincronizada exitosamente en la tabla 'sales'.")
+
+                if "payment_status" not in columns_sales:
+                    print("[*] Aplicando actualizacion: agregando columna 'payment_status' a la tabla 'sales'...")
+                    if is_mysql:
+                        conn.execute(text("ALTER TABLE sales ADD COLUMN payment_status VARCHAR(50) NOT NULL DEFAULT 'paid' AFTER payment_method;"))
+                    else:
+                        conn.execute(text("ALTER TABLE sales ADD COLUMN payment_status VARCHAR(50) NOT NULL DEFAULT 'paid';"))
+                    conn.commit()
+                    print("[OK] Columna 'payment_status' agregada exitosamente a la tabla 'sales'.")
+
+                if "paid_amount_usd" not in columns_sales:
+                    print("[*] Aplicando actualizacion: agregando columnas financieras de cobro a 'sales'...")
+                    if is_mysql:
+                        conn.execute(text("ALTER TABLE sales ADD COLUMN paid_amount_usd FLOAT NOT NULL DEFAULT 0.0 AFTER payment_status;"))
+                        conn.execute(text("ALTER TABLE sales ADD COLUMN paid_amount_ves FLOAT NOT NULL DEFAULT 0.0 AFTER paid_amount_usd;"))
+                        conn.execute(text("ALTER TABLE sales ADD COLUMN debt_amount_usd FLOAT NOT NULL DEFAULT 0.0 AFTER paid_amount_ves;"))
+                        conn.execute(text("ALTER TABLE sales ADD COLUMN debt_amount_ves FLOAT NOT NULL DEFAULT 0.0 AFTER debt_amount_usd;"))
+                        conn.execute(text("ALTER TABLE sales ADD COLUMN due_date DATETIME NULL AFTER debt_amount_ves;"))
+                    else:
+                        conn.execute(text("ALTER TABLE sales ADD COLUMN paid_amount_usd FLOAT NOT NULL DEFAULT 0.0;"))
+                        conn.execute(text("ALTER TABLE sales ADD COLUMN paid_amount_ves FLOAT NOT NULL DEFAULT 0.0;"))
+                        conn.execute(text("ALTER TABLE sales ADD COLUMN debt_amount_usd FLOAT NOT NULL DEFAULT 0.0;"))
+                        conn.execute(text("ALTER TABLE sales ADD COLUMN debt_amount_ves FLOAT NOT NULL DEFAULT 0.0;"))
+                        conn.execute(text("ALTER TABLE sales ADD COLUMN due_date DATETIME NULL;"))
+                    # Inicializar ventas históricas como 100% pagadas
+                    conn.execute(text("UPDATE sales SET paid_amount_usd = total_income_usd, paid_amount_ves = total_income_ves, debt_amount_usd = 0.0, debt_amount_ves = 0.0, payment_status = 'paid' WHERE total_income_usd > 0;"))
+                    conn.commit()
+                    print("[OK] Columnas de cuentas por cobrar agregadas y sincronizadas exitosamente en 'sales'.")
+
         print(f"[OK] Tablas registradas exitosamente en la base de datos:")
         for t in tables:
             print(f"     -> {t}")
