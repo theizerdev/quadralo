@@ -46,6 +46,7 @@ interface Investment {
   bcv_rate: number;
   amount_usd: number;
   quantity: number;
+  initial_quantity?: number;
   shipping_cost_ves: number;
   shipping_cost_usd: number;
   total_cost_usd: number;
@@ -59,6 +60,8 @@ interface Summary {
   total_invested_usd: number;
   total_invested_ves: number;
   total_items_count: number;
+  total_initial_items?: number;
+  total_sold_items?: number;
   total_shipping_usd: number;
   total_shipping_ves?: number;
   investments_count: number;
@@ -241,7 +244,7 @@ export default function InversionesPage() {
     setEditCategory(inv.category || "General");
     setEditAmountVes(inv.amount_ves.toString());
     setEditBcvRate(inv.bcv_rate.toString());
-    setEditQuantity(inv.quantity.toString());
+    setEditQuantity((inv.initial_quantity || inv.quantity).toString());
     const vesShipping = inv.shipping_cost_ves !== undefined 
       ? inv.shipping_cost_ves 
       : roundToTwo(inv.shipping_cost_usd * inv.bcv_rate);
@@ -268,6 +271,14 @@ export default function InversionesPage() {
     }
     if (editNumQuantity <= 0) {
       setEditError("La cantidad debe ser al menos 1 unidad");
+      return;
+    }
+
+    const initialQty = editingItem.initial_quantity || editingItem.quantity;
+    const soldUnits = Math.max(0, initialQty - editingItem.quantity);
+    if (editNumQuantity < soldUnits) {
+      setEditError(`La cantidad total del lote no puede ser menor a ${soldUnits} unidades porque ya se vendieron ${soldUnits} uds.`);
+      notify.warning("Cantidad insuficiente", `Ya se registraron ventas de este lote (${soldUnits} uds vendidas).`);
       return;
     }
 
@@ -479,7 +490,9 @@ export default function InversionesPage() {
               {summary ? summary.total_items_count : 0}
             </div>
             <p className="text-xs text-neutral-500 dark:text-neutral-400 font-medium mt-1">
-              Artículos en inventario base
+              {summary?.total_sold_items !== undefined && summary.total_sold_items > 0
+                ? `${summary.total_sold_items} vendidas de ${summary.total_initial_items ?? summary.total_items_count} compradas`
+                : "Artículos disponibles en inventario"}
             </p>
           </div>
           <div className="relative z-10 text-[11px] text-neutral-500 dark:text-neutral-400 pt-2.5 border-t border-neutral-100 dark:border-neutral-800 flex items-center justify-between">
@@ -708,9 +721,22 @@ export default function InversionesPage() {
                       </span>
                     </div>
                   </div>
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200">
-                    {inv.quantity} uds
-                  </span>
+                  {inv.quantity <= 0 ? (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300">
+                      Agotado (0 uds)
+                    </span>
+                  ) : inv.quantity < (inv.initial_quantity || inv.quantity) ? (
+                    <span
+                      className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300"
+                      title={`Lote inicial: ${inv.initial_quantity || inv.quantity} uds | Vendidas: ${(inv.initial_quantity || inv.quantity) - inv.quantity} uds`}
+                    >
+                      {inv.quantity} de {inv.initial_quantity || inv.quantity} uds
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200">
+                      {inv.quantity} uds
+                    </span>
+                  )}
                 </div>
 
                 {/* Primary Metric Badge: Unit Cost in USD & VES */}
@@ -875,9 +901,29 @@ export default function InversionesPage() {
                       {inv.bcv_rate.toFixed(2)}
                     </td>
                     <td className="py-3 px-4">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200">
-                        {inv.quantity} uds
-                      </span>
+                      {inv.quantity <= 0 ? (
+                        <div>
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300">
+                            Agotado
+                          </span>
+                          <div className="text-[10px] text-neutral-400 mt-0.5">
+                            Lote: {inv.initial_quantity || inv.quantity} uds
+                          </div>
+                        </div>
+                      ) : inv.quantity < (inv.initial_quantity || inv.quantity) ? (
+                        <div>
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300">
+                            {inv.quantity} disp.
+                          </span>
+                          <div className="text-[10px] text-neutral-400 mt-0.5">
+                            de {inv.initial_quantity || inv.quantity} uds
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200">
+                          {inv.quantity} uds
+                        </span>
+                      )}
                     </td>
                     <td className="py-3 px-4 text-neutral-700 dark:text-neutral-300 font-medium">
                       <div>Bs. {(inv.shipping_cost_ves ?? (inv.shipping_cost_usd * inv.bcv_rate)).toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
@@ -1307,15 +1353,22 @@ export default function InversionesPage() {
                 </div>
               </div>
 
-              {/* Cantidad Comprada */}
+              {/* Cantidad Comprada / Lote Total */}
               <div className="space-y-1.5">
-                <Label htmlFor="editQuantity">Cantidad (Uds)</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="editQuantity">Lote Total (Uds)</Label>
+                  {editingItem && (editingItem.initial_quantity || editingItem.quantity) > editingItem.quantity && (
+                    <span className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold" title="Unidades ya vendidas en este lote">
+                      Vendidas: {(editingItem.initial_quantity || editingItem.quantity) - editingItem.quantity}
+                    </span>
+                  )}
+                </div>
                 <div className="relative">
                   <Package className="absolute left-3 top-2.5 size-3.5 text-neutral-400" />
                   <Input
                     id="editQuantity"
                     type="number"
-                    min="1"
+                    min={Math.max(1, (editingItem ? ((editingItem.initial_quantity || editingItem.quantity) - editingItem.quantity) : 1))}
                     className="pl-8 font-semibold rounded-xl"
                     value={editQuantity}
                     onChange={(e) => setEditQuantity(e.target.value)}
@@ -1502,11 +1555,25 @@ export default function InversionesPage() {
                   </span>
                 </div>
                 <div className="flex justify-between py-1 border-b border-neutral-100 dark:border-neutral-800/60">
-                  <span className="text-neutral-500">Unidades en el Lote:</span>
-                  <span className="font-bold text-neutral-900 dark:text-white">
-                    {detailItem.quantity} uds
+                  <span className="text-neutral-500">Stock Disponible:</span>
+                  <span className={`font-bold ${detailItem.quantity <= 0 ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"}`}>
+                    {detailItem.quantity <= 0 ? "Agotado (0 uds)" : `${detailItem.quantity} unidades`}
                   </span>
                 </div>
+                <div className="flex justify-between py-1 border-b border-neutral-100 dark:border-neutral-800/60">
+                  <span className="text-neutral-500">Tamaño del Lote Inicial:</span>
+                  <span className="font-semibold text-neutral-900 dark:text-white">
+                    {detailItem.initial_quantity || detailItem.quantity} uds
+                  </span>
+                </div>
+                {((detailItem.initial_quantity || detailItem.quantity) - detailItem.quantity) > 0 && (
+                  <div className="flex justify-between py-1 border-b border-neutral-100 dark:border-neutral-800/60">
+                    <span className="text-neutral-500">Unidades Vendidas:</span>
+                    <span className="font-semibold text-amber-600 dark:text-amber-400">
+                      {(detailItem.initial_quantity || detailItem.quantity) - detailItem.quantity} uds
+                    </span>
+                  </div>
+                )}
                 <div className="flex justify-between py-1">
                   <span className="text-neutral-700 dark:text-neutral-300 font-bold">Total Desembolsado:</span>
                   <span className="font-extrabold text-neutral-900 dark:text-white text-sm">

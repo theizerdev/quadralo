@@ -86,6 +86,7 @@ def create_investment(
         bcv_rate=investment_in.bcv_rate,
         amount_usd=amount_usd,
         quantity=investment_in.quantity,
+        initial_quantity=investment_in.quantity,
         shipping_cost_usd=shipping_cost_usd,
         total_cost_usd=total_cost_usd,
         unit_cost_usd=unit_cost_usd,
@@ -162,6 +163,8 @@ def get_investment_summary(
     total_usd = sum(inv.total_cost_usd for inv in investments)
     total_ves = sum(inv.amount_ves + (inv.shipping_cost_usd * inv.bcv_rate) for inv in investments)
     total_items = sum(inv.quantity for inv in investments)
+    total_initial_items = sum(getattr(inv, "initial_quantity", inv.quantity) or inv.quantity for inv in investments)
+    total_sold_items = max(0, total_initial_items - total_items)
     total_shipping_usd = sum(inv.shipping_cost_usd for inv in investments)
     total_shipping_ves = sum(inv.shipping_cost_ves for inv in investments)
     current_rate = get_current_bcv_rate(db, current_user.id)
@@ -170,6 +173,8 @@ def get_investment_summary(
         total_invested_usd=round(total_usd, 2),
         total_invested_ves=round(total_ves, 2),
         total_items_count=total_items,
+        total_initial_items=total_initial_items,
+        total_sold_items=total_sold_items,
         total_shipping_usd=round(total_shipping_usd, 2),
         total_shipping_ves=round(total_shipping_ves, 2),
         investments_count=len(investments),
@@ -218,7 +223,9 @@ def update_investment(
     if investment_in.bcv_rate is not None:
         investment.bcv_rate = investment_in.bcv_rate
     if investment_in.quantity is not None:
-        investment.quantity = investment_in.quantity
+        sold_count = max(0, (investment.initial_quantity or investment.quantity) - investment.quantity)
+        investment.initial_quantity = investment_in.quantity
+        investment.quantity = max(0, investment_in.quantity - sold_count)
     
     # Manejar actualización de envío (VES o USD)
     if investment_in.shipping_cost_ves is not None:
@@ -233,7 +240,8 @@ def update_investment(
     # Recalcular valores financieros
     investment.amount_usd = round(investment.amount_ves / investment.bcv_rate, 2)
     investment.total_cost_usd = round(investment.amount_usd + investment.shipping_cost_usd, 2)
-    investment.unit_cost_usd = round(investment.total_cost_usd / investment.quantity, 4)
+    base_qty = investment.initial_quantity if investment.initial_quantity and investment.initial_quantity > 0 else investment.quantity
+    investment.unit_cost_usd = round(investment.total_cost_usd / base_qty, 4) if base_qty > 0 else 0.0
     investment.unit_cost_ves = round(investment.unit_cost_usd * investment.bcv_rate, 2)
 
     db.commit()

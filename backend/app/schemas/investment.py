@@ -31,6 +31,7 @@ class InvestmentResponse(BaseModel):
     bcv_rate: float
     amount_usd: float
     quantity: int
+    initial_quantity: int = 1
     shipping_cost_ves: float = 0.0
     shipping_cost_usd: float = 0.0
     total_cost_usd: float
@@ -46,6 +47,8 @@ class InvestmentSummary(BaseModel):
     total_invested_usd: float
     total_invested_ves: float
     total_items_count: int
+    total_initial_items: Optional[int] = 0
+    total_sold_items: Optional[int] = 0
     total_shipping_usd: float
     total_shipping_ves: float = 0.0
     investments_count: int

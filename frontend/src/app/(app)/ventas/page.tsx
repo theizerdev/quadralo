@@ -52,6 +52,7 @@ interface Investment {
   bcv_rate: number;
   amount_usd: number;
   quantity: number;
+  initial_quantity?: number;
   shipping_cost_ves: number;
   shipping_cost_usd: number;
   total_cost_usd: number;
@@ -468,6 +469,11 @@ export default function VentasPage() {
       setCreateError("La cantidad debe ser mayor a 0");
       return;
     }
+    if (selectedLot && numQuantity > selectedLot.quantity) {
+      setCreateError(`Stock insuficiente en "${selectedLot.product_name}". Disponibles en inventario: ${selectedLot.quantity} uds.`);
+      notify.warning("Stock insuficiente", `Solo dispones de ${selectedLot.quantity} unidades en inventario.`);
+      return;
+    }
     if (computedUnitPriceUsd <= 0 && computedUnitPriceVes <= 0) {
       setCreateError("Debes especificar un monto cobrado o precio de venta mayor a 0");
       notify.warning("Monto requerido", "Ingresa el monto cobrado de la venta.");
@@ -550,6 +556,15 @@ export default function VentasPage() {
     if (editNumQuantity <= 0) {
       setEditError("La cantidad debe ser mayor a 0");
       return;
+    }
+    if (editSelectedLot) {
+      const isSameLot = editingItem.investment_id === editInvestmentId;
+      const effectiveStock = isSameLot ? editSelectedLot.quantity + editingItem.quantity : editSelectedLot.quantity;
+      if (editNumQuantity > effectiveStock) {
+        setEditError(`Stock insuficiente en "${editSelectedLot.product_name}". Disponibles: ${effectiveStock} uds.`);
+        notify.warning("Stock insuficiente", `Solo dispones de ${effectiveStock} unidades en inventario para esta venta.`);
+        return;
+      }
     }
     if (editComputedUnitPriceUsd <= 0 && editComputedUnitPriceVes <= 0) {
       setEditError("Debes especificar un monto cobrado o precio de venta mayor a 0");
@@ -1213,32 +1228,53 @@ export default function VentasPage() {
                   className="w-full h-10 text-xs rounded-xl border border-neutral-200 bg-white px-3 text-neutral-800 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 focus:outline-none font-medium"
                 >
                   <option value="">-- Venta manual o producto sin lote previo --</option>
-                  {investments.map((inv) => (
-                    <option key={inv.id} value={inv.id}>
-                      {inv.product_name} (Lote de {inv.quantity} uds | Costo c/u: ${inv.unit_cost_usd.toFixed(2)} USD / Bs. {(inv.unit_cost_ves || inv.unit_cost_usd * numBcvRate).toFixed(2)})
-                    </option>
-                  ))}
+                  {investments.map((inv) => {
+                    const isOutOfStock = inv.quantity <= 0;
+                    return (
+                      <option key={inv.id} value={inv.id} disabled={isOutOfStock}>
+                        {isOutOfStock ? "🔴 AGOTADO: " : "📦 "}
+                        {inv.product_name} ({inv.quantity} disponibles de {inv.initial_quantity || inv.quantity} uds | Costo: ${inv.unit_cost_usd.toFixed(2)} USD)
+                      </option>
+                    );
+                  })}
                 </select>
 
                 {selectedLot && (
-                  <div className="p-3 rounded-xl bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200/70 dark:border-blue-800/60 text-xs text-blue-900 dark:text-blue-200 space-y-1">
+                  <div className={`p-3 rounded-xl border text-xs space-y-1.5 transition-colors ${
+                    numQuantity > selectedLot.quantity
+                      ? "bg-red-50/80 dark:bg-red-950/40 border-red-200 dark:border-red-800 text-red-900 dark:text-red-200"
+                      : "bg-blue-50/70 dark:bg-blue-950/40 border-blue-200/70 dark:border-blue-800/60 text-blue-900 dark:text-blue-200"
+                  }`}>
                     <div className="flex items-center justify-between font-semibold">
                       <span>📦 Lote: {selectedLot.product_name}</span>
-                      <span className="bg-blue-100 dark:bg-blue-900/60 px-2 py-0.5 rounded-md text-[11px]">
-                        Lote total: {selectedLot.quantity} unidades
+                      <span className={`px-2 py-0.5 rounded-md text-[11px] font-bold ${
+                        selectedLot.quantity <= 0
+                          ? "bg-red-100 text-red-700 dark:bg-red-900/60 dark:text-red-300"
+                          : "bg-blue-100 dark:bg-blue-900/60 text-blue-900 dark:text-blue-200"
+                      }`}>
+                        Stock disponible: {selectedLot.quantity} de {selectedLot.initial_quantity || selectedLot.quantity} unidades
                       </span>
                     </div>
-                    <div className="grid grid-cols-2 gap-2 text-[11px] pt-1 text-blue-800 dark:text-blue-300">
-                      <div>
-                        Costo del lote completo: <strong>${selectedLot.total_cost_usd.toFixed(2)} USD</strong> (Bs. {selectedLot.amount_ves.toLocaleString("es-VE", { minimumFractionDigits: 2 })})
-                      </div>
+                    <div className="grid grid-cols-2 gap-2 text-[11px] pt-1">
                       <div>
                         Costo unitario real: <strong>${selectedLot.unit_cost_usd.toFixed(2)} USD</strong> (Bs. {(selectedLot.unit_cost_ves || selectedLot.unit_cost_usd * numBcvRate).toFixed(2)} c/u)
                       </div>
+                      <div>
+                        Costo base de estas {numQuantity} uds: <strong>${(selectedLot.unit_cost_usd * numQuantity).toFixed(2)} USD</strong>
+                      </div>
                     </div>
-                    <div className="pt-1 text-[11px] font-medium text-blue-700 dark:text-blue-300 border-t border-blue-200/60 dark:border-blue-800/60 flex items-center justify-between">
-                      <span>Al vender {numQuantity} de {selectedLot.quantity} uds, el costo base de estas {numQuantity} uds es: <strong>${(selectedLot.unit_cost_usd * numQuantity).toFixed(2)} USD</strong> (Bs. {((selectedLot.unit_cost_ves || selectedLot.unit_cost_usd * numBcvRate) * numQuantity).toFixed(2)})</span>
-                      <span>Stock restante: <strong>{Math.max(0, selectedLot.quantity - numQuantity)} uds</strong></span>
+                    <div className="pt-1.5 text-[11px] font-medium border-t border-current/20 flex items-center justify-between">
+                      {numQuantity > selectedLot.quantity ? (
+                        <span className="font-bold text-red-600 dark:text-red-400 flex items-center gap-1">
+                          <AlertTriangle className="size-3.5 shrink-0" />
+                          ¡Stock insuficiente! Quieres vender {numQuantity} uds pero solo dispones de {selectedLot.quantity} uds.
+                        </span>
+                      ) : (
+                        <>
+                          <span>El sistema descontará {numQuantity} uds del inventario automáticamente.</span>
+                          <span>Stock restante: <strong>{selectedLot.quantity - numQuantity} uds</strong></span>
+                        </>
+                      )}
                     </div>
                   </div>
                 )}
@@ -1615,31 +1651,59 @@ export default function VentasPage() {
                   className="w-full h-10 text-xs rounded-xl border border-neutral-200 bg-white px-3 text-neutral-800 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 focus:outline-none font-medium"
                 >
                   <option value="">-- Venta manual o producto sin lote previo --</option>
-                  {investments.map((inv) => (
-                    <option key={inv.id} value={inv.id}>
-                      {inv.product_name} (Lote de {inv.quantity} uds | Costo c/u: ${inv.unit_cost_usd.toFixed(2)} USD / Bs. {(inv.unit_cost_ves || inv.unit_cost_usd * editNumBcvRate).toFixed(2)})
-                    </option>
-                  ))}
+                  {investments.map((inv) => {
+                    const isSameLot = editingItem?.investment_id === inv.id;
+                    const availableForEdit = isSameLot ? inv.quantity + (editingItem?.quantity || 0) : inv.quantity;
+                    const isOutOfStock = availableForEdit <= 0;
+                    return (
+                      <option key={inv.id} value={inv.id} disabled={isOutOfStock}>
+                        {isOutOfStock ? "🔴 AGOTADO: " : "📦 "}
+                        {inv.product_name} ({availableForEdit} disponibles | Lote de {inv.initial_quantity || inv.quantity} uds | Costo: ${inv.unit_cost_usd.toFixed(2)} USD)
+                      </option>
+                    );
+                  })}
                 </select>
 
                 {editSelectedLot && (
-                  <div className="p-3 rounded-xl bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200/70 dark:border-blue-800/60 text-xs text-blue-900 dark:text-blue-200 space-y-1">
+                  <div className={`p-3 rounded-xl border text-xs space-y-1.5 transition-colors ${
+                    (() => {
+                      const isSameLot = editingItem?.investment_id === editInvestmentId;
+                      const maxAvail = isSameLot ? editSelectedLot.quantity + (editingItem?.quantity || 0) : editSelectedLot.quantity;
+                      return editNumQuantity > maxAvail;
+                    })()
+                      ? "bg-red-50/80 dark:bg-red-950/40 border-red-200 dark:border-red-800 text-red-900 dark:text-red-200"
+                      : "bg-blue-50/70 dark:bg-blue-950/40 border-blue-200/70 dark:border-blue-800/60 text-blue-900 dark:text-blue-200"
+                  }`}>
                     <div className="flex items-center justify-between font-semibold">
                       <span>📦 Lote: {editSelectedLot.product_name}</span>
-                      <span className="bg-blue-100 dark:bg-blue-900/60 px-2 py-0.5 rounded-md text-[11px]">
-                        Lote total: {editSelectedLot.quantity} unidades
+                      <span className="bg-blue-100 dark:bg-blue-900/60 px-2 py-0.5 rounded-md text-[11px] font-bold text-blue-900 dark:text-blue-200">
+                        Stock en almacén: {editSelectedLot.quantity} uds (Lote original: {editSelectedLot.initial_quantity || editSelectedLot.quantity} uds)
                       </span>
                     </div>
-                    <div className="grid grid-cols-2 gap-2 text-[11px] pt-1 text-blue-800 dark:text-blue-300">
-                      <div>
-                        Costo total del lote: <strong>${editSelectedLot.total_cost_usd.toFixed(2)} USD</strong> (Bs. {editSelectedLot.amount_ves.toLocaleString("es-VE", { minimumFractionDigits: 2 })})
-                      </div>
+                    <div className="grid grid-cols-2 gap-2 text-[11px] pt-1">
                       <div>
                         Costo unitario real: <strong>${editSelectedLot.unit_cost_usd.toFixed(2)} USD</strong> (Bs. {(editSelectedLot.unit_cost_ves || editSelectedLot.unit_cost_usd * editNumBcvRate).toFixed(2)} c/u)
                       </div>
+                      <div>
+                        Costo proporcional {editNumQuantity} uds: <strong>${(editSelectedLot.unit_cost_usd * editNumQuantity).toFixed(2)} USD</strong>
+                      </div>
                     </div>
-                    <div className="pt-1 text-[11px] font-medium text-blue-700 dark:text-blue-300 border-t border-blue-200/60 dark:border-blue-800/60">
-                      Costo proporcional de estas {editNumQuantity} uds: <strong>${(editSelectedLot.unit_cost_usd * editNumQuantity).toFixed(2)} USD</strong> (Bs. {((editSelectedLot.unit_cost_ves || editSelectedLot.unit_cost_usd * editNumBcvRate) * editNumQuantity).toFixed(2)})
+                    <div className="pt-1.5 text-[11px] font-medium border-t border-current/20 flex items-center justify-between">
+                      {(() => {
+                        const isSameLot = editingItem?.investment_id === editInvestmentId;
+                        const maxAvail = isSameLot ? editSelectedLot.quantity + (editingItem?.quantity || 0) : editSelectedLot.quantity;
+                        if (editNumQuantity > maxAvail) {
+                          return (
+                            <span className="font-bold text-red-600 dark:text-red-400 flex items-center gap-1">
+                              <AlertTriangle className="size-3.5 shrink-0" />
+                              ¡Stock insuficiente! Máximo disponible para esta venta: {maxAvail} uds.
+                            </span>
+                          );
+                        }
+                        return (
+                          <span>El inventario se reajustará automáticamente con la diferencia.</span>
+                        );
+                      })()}
                     </div>
                   </div>
                 )}

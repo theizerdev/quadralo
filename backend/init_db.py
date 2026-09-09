@@ -116,7 +116,7 @@ def create_tables():
                     conn.commit()
                     print("[OK] Columna 'verification_code_expires_at' agregada exitosamente a la tabla 'users'.")
 
-        # Migración automática si la tabla investments ya existía sin la columna category
+        # Migración automática si la tabla investments ya existía sin la columna category o initial_quantity
         if "investments" in tables:
             columns_inv = [col["name"] for col in inspector.get_columns("investments")]
             with engine.connect() as conn:
@@ -128,6 +128,15 @@ def create_tables():
                         conn.execute(text("ALTER TABLE investments ADD COLUMN category VARCHAR(100) NOT NULL DEFAULT 'General';"))
                     conn.commit()
                     print("[OK] Columna 'category' agregada exitosamente a la tabla 'investments'.")
+                if "initial_quantity" not in columns_inv:
+                    print("[*] Aplicando actualizacion: agregando columna 'initial_quantity' a la tabla 'investments'...")
+                    if engine.url.get_backend_name() == "mysql":
+                        conn.execute(text("ALTER TABLE investments ADD COLUMN initial_quantity INT NOT NULL DEFAULT 1 AFTER quantity;"))
+                    else:
+                        conn.execute(text("ALTER TABLE investments ADD COLUMN initial_quantity INT NOT NULL DEFAULT 1;"))
+                    conn.execute(text("UPDATE investments SET initial_quantity = quantity WHERE quantity > 0;"))
+                    conn.commit()
+                    print("[OK] Columna 'initial_quantity' agregada y sincronizada exitosamente en la tabla 'investments'.")
 
         print(f"[OK] Tablas registradas exitosamente en la base de datos:")
         for t in tables:

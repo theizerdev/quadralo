@@ -49,19 +49,43 @@ def create_sale(
     
     unit_cost_usd = sale_in.unit_cost_usd or 0.0
 
-    # Si está vinculada a un lote de inversión, validar lote y extraer costo unitario real
+    # Vincular lote de inversión y descontar inventario automáticamente
+    target_investment = None
     if sale_in.investment_id:
-        investment = (
+        target_investment = (
             db.query(Investment)
             .filter(Investment.id == sale_in.investment_id, Investment.user_id == current_user.id)
             .first()
         )
-        if not investment:
+        if not target_investment:
             raise HTTPException(status_code=404, detail="Lote de inversión no encontrado")
+    else:
+        # Búsqueda automática inteligente por nombre de producto con stock disponible (FIFO)
+        target_investment = (
+            db.query(Investment)
+            .filter(
+                Investment.user_id == current_user.id,
+                Investment.product_name.ilike(sale_in.product_name.strip()),
+                Investment.quantity > 0,
+            )
+            .order_by(Investment.created_at.asc())
+            .first()
+        )
+
+    if target_investment:
+        if target_investment.quantity < sale_in.quantity:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Stock insuficiente en el lote '{target_investment.product_name}'. Solo quedan {target_investment.quantity} unidades disponibles."
+            )
         
+        # Descontar del inventario de inversión
+        target_investment.quantity -= sale_in.quantity
+        sale_in.investment_id = target_investment.id
+
         # Asignar costo unitario de la inversión si no se suministró uno manual
         if unit_cost_usd == 0.0:
-            unit_cost_usd = investment.unit_cost_usd
+            unit_cost_usd = target_investment.unit_cost_usd
 
     # Validar precios en USD y VES
     if sale_in.unit_price_usd is not None and sale_in.unit_price_usd > 0:
@@ -446,6 +470,40 @@ def update_sale(
     if not sale:
         raise HTTPException(status_code=404, detail="Venta no encontrada")
 
+    # Sincronización de inventario si cambia la cantidad o el lote
+    old_inv_id = sale.investment_id
+    old_quantity = sale.quantity
+    new_inv_id = sale_in.investment_id if sale_in.investment_id is not None else old_inv_id
+    new_quantity = sale_in.quantity if sale_in.quantity is not None else old_quantity
+
+    if old_inv_id == new_inv_id:
+        if old_inv_id and new_quantity != old_quantity:
+            inv = db.query(Investment).filter(Investment.id == old_inv_id, Investment.user_id == current_user.id).first()
+            if inv:
+                qty_diff = new_quantity - old_quantity
+                if qty_diff > 0 and inv.quantity < qty_diff:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Stock insuficiente en '{inv.product_name}'. Solo quedan {inv.quantity} unidades adicionales en inventario."
+                    )
+                inv.quantity -= qty_diff
+    else:
+        # Cambió de lote de inversión
+        if old_inv_id:
+            old_inv = db.query(Investment).filter(Investment.id == old_inv_id, Investment.user_id == current_user.id).first()
+            if old_inv:
+                old_inv.quantity += old_quantity
+        if new_inv_id:
+            new_inv = db.query(Investment).filter(Investment.id == new_inv_id, Investment.user_id == current_user.id).first()
+            if not new_inv:
+                raise HTTPException(status_code=404, detail="Nuevo lote de inversión no encontrado")
+            if new_inv.quantity < new_quantity:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Stock insuficiente en el nuevo lote '{new_inv.product_name}'. Disponibles: {new_inv.quantity} unidades."
+                )
+            new_inv.quantity -= new_quantity
+
     if sale_in.product_name is not None:
         sale.product_name = sale_in.product_name
     if sale_in.investment_id is not None:
@@ -494,13 +552,19 @@ def delete_sale(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Eliminar un registro de venta."""
+    """Eliminar un registro de venta y restituir el stock al inventario de inversión."""
     query = db.query(Sale).filter(Sale.id == sale_id)
     if not (current_user.is_superuser or current_user.role == "superadmin"):
         query = query.filter(Sale.user_id == current_user.id)
     sale = query.first()
     if not sale:
         raise HTTPException(status_code=404, detail="Venta no encontrada")
+
+    # Restituir stock al lote de inversión
+    if sale.investment_id:
+        inv = db.query(Investment).filter(Investment.id == sale.investment_id).first()
+        if inv:
+            inv.quantity += sale.quantity
 
     db.delete(sale)
     db.commit()
