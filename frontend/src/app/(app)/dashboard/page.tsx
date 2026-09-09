@@ -562,13 +562,13 @@ export default function DashboardPage() {
   return (
     <div className="flex flex-1 flex-col gap-5 pb-10">
       {/* 1. Header Principal y Controles de Moneda / BCV */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white dark:bg-neutral-900/70 p-5 rounded-2xl border border-neutral-200/80 dark:border-neutral-800 shadow-2xs">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white dark:bg-neutral-900/70 p-4 sm:p-5 rounded-2xl border border-neutral-200/80 dark:border-neutral-800 shadow-2xs">
         <div className="space-y-1">
           <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
             <Sparkles className="size-3" />
             <span>Quádralo · {user.business_name}</span>
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-neutral-900 dark:text-white">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-neutral-900 dark:text-white">
             Resumen Financiero Ejecutivo
           </h1>
           <p className="text-xs text-neutral-500 dark:text-neutral-400">
@@ -577,11 +577,11 @@ export default function DashboardPage() {
         </div>
 
         {/* Acciones de Moneda, Tasa BCV y Refrescar */}
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
           {/* Tasa BCV Oficial */}
           <Link
             href="/bcv"
-            className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-200 hover:border-emerald-500 transition-colors text-xs font-medium group"
+            className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-200 hover:border-emerald-500 transition-colors text-xs font-medium group shrink-0"
             title="Tasa oficial BCV. Haz clic para consultar o ajustar."
           >
             <div className="size-2 rounded-full bg-emerald-500 animate-pulse"></div>
@@ -590,10 +590,10 @@ export default function DashboardPage() {
           </Link>
 
           {/* Toggle de Moneda Dual */}
-          <div className="flex items-center rounded-xl bg-neutral-100 p-1 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700">
+          <div className="flex items-center rounded-xl bg-neutral-100 p-1 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 shrink-0">
             <button
               onClick={() => setCurrency("USD")}
-              className={`flex items-center gap-1 px-3 py-1 text-xs font-semibold rounded-lg transition-all ${
+              className={`flex items-center gap-1 px-2.5 sm:px-3 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
                 currency === "USD"
                   ? "bg-white text-neutral-900 shadow-xs dark:bg-neutral-700 dark:text-white"
                   : "text-neutral-500 hover:text-neutral-900 dark:hover:text-white"
@@ -604,7 +604,7 @@ export default function DashboardPage() {
             </button>
             <button
               onClick={() => setCurrency("VES")}
-              className={`flex items-center gap-1 px-3 py-1 text-xs font-semibold rounded-lg transition-all ${
+              className={`flex items-center gap-1 px-2.5 sm:px-3 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
                 currency === "VES"
                   ? "bg-white text-neutral-900 shadow-xs dark:bg-neutral-700 dark:text-white"
                   : "text-neutral-500 hover:text-neutral-900 dark:hover:text-white"
@@ -621,14 +621,14 @@ export default function DashboardPage() {
             size="icon"
             onClick={fetchData}
             disabled={refreshing}
-            className="rounded-xl size-8"
+            className="rounded-xl size-8 shrink-0"
             title="Actualizar datos en tiempo real"
           >
             <RefreshCw className={`size-3.5 ${refreshing ? "animate-spin" : ""}`} />
           </Button>
 
           {/* Acciones directas */}
-          <Link href="/ventas">
+          <Link href="/ventas" className="shrink-0">
             <Button className="gap-1.5 rounded-xl bg-neutral-900 text-white hover:bg-neutral-800 dark:bg-emerald-600 dark:hover:bg-emerald-700 text-xs h-8 px-3">
               <Plus className="size-3.5" />
               <span>Nueva Venta</span>
@@ -638,14 +638,16 @@ export default function DashboardPage() {
       </div>
 
       {/* 2. Barra de Filtro por Rango de Fechas en Tiempo Real */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-white dark:bg-neutral-900/60 p-3.5 rounded-xl border border-neutral-200/80 dark:border-neutral-800">
-        <div className="flex items-center gap-2">
-          <Calendar className="size-4 text-neutral-400 shrink-0" />
-          <span className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">
-            Período:
-          </span>
-          {/* Pills de presets */}
-          <div className="flex flex-wrap items-center gap-1">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-white dark:bg-neutral-900/60 p-3 sm:p-3.5 rounded-xl border border-neutral-200/80 dark:border-neutral-800">
+        <div className="flex flex-col xs:flex-row items-start xs:items-center gap-2 w-full sm:w-auto">
+          <div className="flex items-center gap-1.5 shrink-0">
+            <Calendar className="size-4 text-neutral-400 shrink-0" />
+            <span className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">
+              Período:
+            </span>
+          </div>
+          {/* Pills de presets con swipe horizontal suave en móvil */}
+          <div className="flex items-center gap-1 overflow-x-auto max-w-full pb-1 xs:pb-0 scrollbar-none flex-nowrap sm:flex-wrap">
             {[
               { id: "today", label: "Hoy" },
               { id: "7d", label: "7 Días" },
@@ -666,7 +668,7 @@ export default function DashboardPage() {
                     setCustomRangeActive(false);
                   }
                 }}
-                className={`px-2.5 py-1 text-xs rounded-lg font-medium transition-all ${
+                className={`px-2.5 py-1 text-xs rounded-lg font-medium transition-all shrink-0 cursor-pointer ${
                   preset === tab.id
                     ? "bg-neutral-900 text-white dark:bg-emerald-600 dark:text-white shadow-2xs font-semibold"
                     : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800"

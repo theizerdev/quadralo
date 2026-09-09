@@ -38,17 +38,20 @@ export function AppSidebarHeader({
   const usdtRate = rates?.usdt_p2p?.rate;
 
   return (
-    <header className="flex h-14 shrink-0 items-center gap-2 border-b border-neutral-200/70 dark:border-neutral-800/70 px-4 transition-[width,height] ease-linear">
-      <SidebarTrigger className="-ml-1" />
-      <Separator orientation="vertical" className="mr-1 h-4" />
-      <Breadcrumbs breadcrumbs={breadcrumbs} />
+    <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b border-neutral-200/70 dark:border-neutral-800/70 px-3 sm:px-4 bg-white/90 dark:bg-neutral-950/90 backdrop-blur-md transition-[width,height] ease-linear">
+      <SidebarTrigger className="-ml-1 shrink-0" />
+      <Separator orientation="vertical" className="mr-1 h-4 hidden sm:block" />
+      
+      <div className="flex items-center min-w-0 flex-1 sm:flex-initial overflow-hidden">
+        <Breadcrumbs breadcrumbs={breadcrumbs} />
+      </div>
 
       {/* Right side widgets */}
-      <div className="ml-auto flex items-center gap-2">
+      <div className="ml-auto flex items-center gap-1.5 sm:gap-2 shrink-0">
         {/* BCV Dollar Chip */}
         <Link
           href="/bcv"
-          className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/60 dark:border-emerald-800/60 text-emerald-800 dark:text-emerald-300 text-xs font-medium hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors"
+          className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/60 dark:border-emerald-800/60 text-emerald-800 dark:text-emerald-300 text-xs font-medium hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors shrink-0"
           title="Ver o modificar tasas oficiales y USDT"
         >
           <span className="relative flex size-2">
@@ -60,7 +63,7 @@ export function AppSidebarHeader({
             Bs. {usdRate ? usdRate.toFixed(2) : "..."}
           </span>
           {isCustom && (
-            <span className="text-[10px] bg-amber-200 text-amber-900 dark:bg-amber-900 dark:text-amber-100 px-1 rounded font-semibold">
+            <span className="text-[10px] bg-amber-200 text-amber-900 dark:bg-amber-900 dark:text-amber-100 px-1 rounded font-semibold hidden sm:inline">
               Manual
             </span>
           )}

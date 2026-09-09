@@ -6,6 +6,7 @@ import {
   SidebarHeader,
   SidebarContent,
   SidebarFooter,
+  SidebarCloseTrigger,
 } from "@/components/ui/sidebar";
 import { AppLogo } from "@/components/app-logo";
 import { NavMain, NavItem } from "@/components/nav-main";
@@ -76,8 +77,9 @@ export function AppSidebar() {
 
   return (
     <Sidebar>
-      <SidebarHeader>
+      <SidebarHeader className="flex items-center justify-between">
         <AppLogo name={user?.business_name || "Quádralo"} />
+        <SidebarCloseTrigger />
       </SidebarHeader>
 
       <SidebarContent>

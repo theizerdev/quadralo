@@ -1,8 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { PanelLeft } from "lucide-react";
+import { PanelLeft, Menu, X } from "lucide-react";
 import { cn } from "@/components/ui/card";
+import { usePathname } from "next/navigation";
 
 interface SidebarContextType {
   open: boolean;
@@ -33,15 +34,50 @@ export function SidebarProvider({
   const [open, setOpen] = React.useState(defaultOpen);
   const [openMobile, setOpenMobile] = React.useState(false);
   const [isMobile, setIsMobile] = React.useState(false);
+  const pathname = usePathname();
 
+  // Detección reactiva de pantalla móvil/tablet (< 1024px, breakpoint 'lg')
   React.useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
+    const mediaQuery = window.matchMedia("(max-width: 1023px)");
+    const handleChange = (e: MediaQueryListEvent | MediaQueryList) => {
+      const mobile = e.matches;
+      setIsMobile(mobile);
+      if (!mobile) {
+        setOpenMobile(false);
+      }
     };
-    checkMobile();
-    window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
+    handleChange(mediaQuery);
+    mediaQuery.addEventListener("change", handleChange);
+    return () => mediaQuery.removeEventListener("change", handleChange);
   }, []);
+
+  // Cierre automático del drawer móvil al cambiar de ruta
+  React.useEffect(() => {
+    setOpenMobile(false);
+  }, [pathname]);
+
+  // Cierre al pulsar tecla Escape
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && openMobile) {
+        setOpenMobile(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [openMobile]);
+
+  // Bloqueo de scroll en body cuando el drawer móvil está abierto
+  React.useEffect(() => {
+    if (isMobile && openMobile) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isMobile, openMobile]);
 
   const toggleSidebar = React.useCallback(() => {
     if (isMobile) {
@@ -62,7 +98,7 @@ export function SidebarProvider({
         setOpenMobile,
       }}
     >
-      <div className="flex min-h-screen w-full bg-neutral-50 dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100">
+      <div className="flex min-h-screen w-full bg-neutral-50 dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 overflow-x-hidden">
         {children}
       </div>
     </SidebarContext.Provider>
@@ -77,15 +113,41 @@ export function SidebarTrigger({
 
   return (
     <button
+      type="button"
       onClick={toggleSidebar}
       className={cn(
-        "inline-flex h-8 w-8 items-center justify-center rounded-lg p-1 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-100 transition-colors",
+        "inline-flex h-9 w-9 items-center justify-center rounded-xl text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 cursor-pointer",
         className
       )}
-      aria-label="Toggle Sidebar"
+      aria-label="Abrir o cerrar menú lateral"
       {...props}
     >
-      <PanelLeft className="h-4 w-4" />
+      {/* Icono para móvil/tablet: Hamburguesa */}
+      <Menu className="size-5 lg:hidden" />
+      {/* Icono para escritorio: PanelLeft */}
+      <PanelLeft className="size-4 hidden lg:block" />
+    </button>
+  );
+}
+
+export function SidebarCloseTrigger({
+  className,
+  ...props
+}: React.ButtonHTMLAttributes<HTMLButtonElement>) {
+  const { setOpenMobile } = useSidebar();
+
+  return (
+    <button
+      type="button"
+      onClick={() => setOpenMobile(false)}
+      className={cn(
+        "lg:hidden inline-flex size-8 items-center justify-center rounded-lg text-neutral-400 hover:text-neutral-900 hover:bg-neutral-200/60 dark:hover:text-white dark:hover:bg-neutral-800 transition-colors focus-visible:outline-none cursor-pointer",
+        className
+      )}
+      aria-label="Cerrar menú lateral"
+      {...props}
+    >
+      <X className="size-5" />
     </button>
   );
 }
@@ -100,7 +162,7 @@ export function SidebarInset({
   return (
     <div
       className={cn(
-        "flex flex-1 flex-col min-w-0 bg-white dark:bg-neutral-950 transition-[margin] duration-300 ease-in-out",
+        "flex flex-1 flex-col min-w-0 w-full bg-white dark:bg-neutral-950 transition-[margin] duration-300 ease-in-out",
         className
       )}
     >
@@ -116,26 +178,31 @@ export function Sidebar({
   children: React.ReactNode;
   className?: string;
 }) {
-  const { open, isMobile, openMobile, setOpenMobile } = useSidebar();
+  const { open, openMobile, setOpenMobile } = useSidebar();
 
   return (
     <>
-      {/* Mobile overlay */}
-      {isMobile && openMobile && (
-        <div
-          className="fixed inset-0 z-40 bg-black/50 backdrop-blur-xs transition-opacity md:hidden"
-          onClick={() => setOpenMobile(false)}
-        />
-      )}
+      {/* Mobile overlay backdrop */}
+      <div
+        className={cn(
+          "fixed inset-0 z-40 bg-black/60 backdrop-blur-xs transition-opacity duration-300 lg:hidden",
+          openMobile ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+        )}
+        onClick={() => setOpenMobile(false)}
+        aria-hidden="true"
+      />
 
+      {/* Barra Lateral / Drawer */}
       <aside
         className={cn(
-          "bg-neutral-50 dark:bg-neutral-900/70 border-r border-neutral-200/80 dark:border-neutral-800 flex flex-col transition-all duration-200 ease-in-out z-50",
-          isMobile
-            ? "fixed inset-y-0 left-0 w-64 shadow-2xl"
-            : "sticky top-0 h-screen",
-          isMobile && !openMobile ? "-translate-x-full" : "translate-x-0",
-          !isMobile && (open ? "w-64" : "w-16"),
+          // Estilo base
+          "bg-neutral-50 dark:bg-neutral-900/95 border-r border-neutral-200/80 dark:border-neutral-800 flex flex-col transition-all duration-300 ease-in-out",
+          // Móvil & Tablet (< 1024px / < lg): Drawer off-canvas flotante
+          "fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] shadow-2xl lg:shadow-none",
+          openMobile ? "translate-x-0" : "-translate-x-full",
+          // Escritorio (>= 1024px / lg): Integrado en el flex flow
+          "lg:static lg:translate-x-0 lg:h-screen lg:sticky lg:top-0 lg:z-30",
+          open ? "lg:w-64" : "lg:w-16",
           className
         )}
       >
