@@ -4,6 +4,7 @@ from typing import Optional
 
 class InvestmentCreate(BaseModel):
     product_name: str = Field(..., min_length=1, description="Nombre del producto o lote")
+    category: Optional[str] = Field(default="General", description="Categoría del producto o lote")
     amount_ves: float = Field(..., gt=0, description="Monto invertido en Bolívares")
     bcv_rate: float = Field(..., gt=0, description="Tasa del Banco Central de Venezuela")
     quantity: int = Field(..., gt=0, description="Cantidad de productos comprados")
@@ -13,6 +14,7 @@ class InvestmentCreate(BaseModel):
 
 class InvestmentUpdate(BaseModel):
     product_name: Optional[str] = None
+    category: Optional[str] = None
     amount_ves: Optional[float] = Field(None, gt=0)
     bcv_rate: Optional[float] = Field(None, gt=0)
     quantity: Optional[int] = Field(None, gt=0)
@@ -24,6 +26,7 @@ class InvestmentResponse(BaseModel):
     id: str
     user_id: str
     product_name: str
+    category: str = "General"
     amount_ves: float
     bcv_rate: float
     amount_usd: float

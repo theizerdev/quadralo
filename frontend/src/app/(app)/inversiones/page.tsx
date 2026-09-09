@@ -41,6 +41,7 @@ import {
 interface Investment {
   id: string;
   product_name: string;
+  category: string;
   amount_ves: number;
   bcv_rate: number;
   amount_usd: number;
@@ -73,11 +74,14 @@ export default function InversionesPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
   const [sortBy, setSortBy] = useState<"date_desc" | "date_asc" | "amount_desc" | "cost_desc">("date_desc");
+  const [categories, setCategories] = useState<string[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string>("Todas");
 
   // Create Modal states
   const [openCreateModal, setOpenCreateModal] = useState(false);
   const [submittingCreate, setSubmittingCreate] = useState(false);
   const [productName, setProductName] = useState("");
+  const [category, setCategory] = useState("General");
   const [amountVes, setAmountVes] = useState("");
   const [bcvRate, setBcvRate] = useState("75.50");
   const [quantity, setQuantity] = useState("1");
@@ -90,6 +94,7 @@ export default function InversionesPage() {
   const [submittingEdit, setSubmittingEdit] = useState(false);
   const [editingItem, setEditingItem] = useState<Investment | null>(null);
   const [editProductName, setEditProductName] = useState("");
+  const [editCategory, setEditCategory] = useState("General");
   const [editAmountVes, setEditAmountVes] = useState("");
   const [editBcvRate, setEditBcvRate] = useState("");
   const [editQuantity, setEditQuantity] = useState("");
@@ -134,6 +139,16 @@ export default function InversionesPage() {
 
   const roundToTwo = (num: number) => Math.round((num + Number.EPSILON) * 100) / 100;
 
+  const availableCategories = useMemo(() => {
+    const set = new Set<string>(["General", ...categories]);
+    investments.forEach((inv) => {
+      if (inv.category && inv.category.trim()) {
+        set.add(inv.category.trim());
+      }
+    });
+    return Array.from(set).sort();
+  }, [categories, investments]);
+
   useEffect(() => {
     loadData();
   }, []);
@@ -141,12 +156,16 @@ export default function InversionesPage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [invData, sumData] = await Promise.all([
+      const [invData, sumData, catsData] = await Promise.all([
         apiFetch<Investment[]>("/investments/"),
         apiFetch<Summary>("/investments/summary"),
+        apiFetch<string[]>("/investments/categories").catch(() => ["General"]),
       ]);
       setInvestments(invData);
       setSummary(sumData);
+      if (catsData) {
+        setCategories(catsData);
+      }
       if (sumData.current_bcv_rate) {
         setBcvRate(sumData.current_bcv_rate.toString());
       }
@@ -186,6 +205,7 @@ export default function InversionesPage() {
         method: "POST",
         body: JSON.stringify({
           product_name: productName.trim(),
+          category: category.trim() || "General",
           amount_ves: numAmountVes,
           bcv_rate: numBcvRate,
           quantity: numQuantity,
@@ -195,10 +215,11 @@ export default function InversionesPage() {
         }),
       });
 
-      notify.success("Inversión registrada", `"${created.product_name}" se guardó con éxito.`);
+      notify.success("Inversión registrada", `"${created.product_name}" se guardó con éxito en categoría "${created.category || "General"}".`);
 
       // Reset form and close
       setProductName("");
+      setCategory("General");
       setAmountVes("");
       setQuantity("1");
       setShippingCostVes("0");
@@ -217,6 +238,7 @@ export default function InversionesPage() {
   const handleOpenEdit = (inv: Investment) => {
     setEditingItem(inv);
     setEditProductName(inv.product_name);
+    setEditCategory(inv.category || "General");
     setEditAmountVes(inv.amount_ves.toString());
     setEditBcvRate(inv.bcv_rate.toString());
     setEditQuantity(inv.quantity.toString());
@@ -257,6 +279,7 @@ export default function InversionesPage() {
         method: "PUT",
         body: JSON.stringify({
           product_name: editProductName.trim(),
+          category: editCategory.trim() || "General",
           amount_ves: editNumAmountVes,
           bcv_rate: editNumBcvRate,
           quantity: editNumQuantity,
@@ -322,9 +345,17 @@ export default function InversionesPage() {
   // Filtered and sorted investments
   const filteredInvestments = useMemo(() => {
     let result = investments.filter((inv) => {
-      const matchProduct = inv.product_name.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchNotes = inv.notes ? inv.notes.toLowerCase().includes(searchQuery.toLowerCase()) : false;
-      return matchProduct || matchNotes;
+      const currentCat = inv.category || "General";
+      const matchesCategory =
+        selectedCategory === "Todas" ||
+        currentCat.toLowerCase() === selectedCategory.toLowerCase();
+
+      const q = searchQuery.toLowerCase();
+      const matchProduct = inv.product_name.toLowerCase().includes(q);
+      const matchCat = currentCat.toLowerCase().includes(q);
+      const matchNotes = inv.notes ? inv.notes.toLowerCase().includes(q) : false;
+
+      return matchesCategory && (matchProduct || matchCat || matchNotes);
     });
 
     result.sort((a, b) => {
@@ -344,7 +375,7 @@ export default function InversionesPage() {
     });
 
     return result;
-  }, [investments, searchQuery, sortBy]);
+  }, [investments, searchQuery, sortBy, selectedCategory]);
 
   const formatDate = (dateStr: string) => {
     try {
@@ -518,6 +549,48 @@ export default function InversionesPage() {
         </div>
       </div>
 
+      {/* Category Filter Pills Bar */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+        <span className="text-xs font-semibold text-neutral-400 shrink-0 flex items-center gap-1.5 mr-1">
+          <Tag className="size-3.5" />
+          Categorías:
+        </span>
+        <button
+          onClick={() => setSelectedCategory("Todas")}
+          className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all shrink-0 ${
+            selectedCategory === "Todas"
+              ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 md-elevation-1"
+              : "bg-white hover:bg-neutral-100 text-neutral-600 dark:bg-neutral-900 dark:hover:bg-neutral-800 dark:text-neutral-300 border border-neutral-200/80 dark:border-neutral-800"
+          }`}
+        >
+          Todas ({investments.length})
+        </button>
+        {availableCategories.map((cat) => {
+          const count = investments.filter((i) => (i.category || "General").toLowerCase() === cat.toLowerCase()).length;
+          const isSelected = selectedCategory.toLowerCase() === cat.toLowerCase();
+          return (
+            <button
+              key={cat}
+              onClick={() => setSelectedCategory(cat)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all shrink-0 flex items-center gap-1.5 ${
+                isSelected
+                  ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 md-elevation-1"
+                  : "bg-white hover:bg-neutral-100 text-neutral-600 dark:bg-neutral-900 dark:hover:bg-neutral-800 dark:text-neutral-300 border border-neutral-200/80 dark:border-neutral-800"
+              }`}
+            >
+              <span>{cat}</span>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                isSelected
+                  ? "bg-neutral-800 text-neutral-200 dark:bg-neutral-200 dark:text-neutral-800"
+                  : "bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400"
+              }`}>
+                {count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
       {/* Control Bar: Search, Sort and View Mode Switcher */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-neutral-900/60 p-3.5 rounded-2xl border border-neutral-200/80 dark:border-neutral-800 md-elevation-1">
         <div className="relative flex-1 max-w-md">
@@ -617,15 +690,22 @@ export default function InversionesPage() {
               <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-neutral-300 via-neutral-400 to-neutral-500 dark:from-neutral-700 dark:via-neutral-600 dark:to-neutral-800 group-hover:from-blue-500 group-hover:via-emerald-500 group-hover:to-teal-500 transition-all duration-300"></div>
 
               <div>
-                {/* Header: Product Name + Date */}
+                {/* Header: Product Name + Category + Date */}
                 <div className="flex items-start justify-between gap-3 pt-1">
                   <div>
                     <h3 className="text-base font-bold text-neutral-900 dark:text-white line-clamp-1">
                       {inv.product_name}
                     </h3>
-                    <div className="flex items-center gap-1.5 text-[11px] text-neutral-400 mt-0.5">
-                      <Calendar className="size-3" />
-                      <span>{formatDate(inv.created_at)}</span>
+                    <div className="flex items-center gap-2 text-[11px] text-neutral-400 mt-0.5">
+                      <div className="flex items-center gap-1">
+                        <Calendar className="size-3" />
+                        <span>{formatDate(inv.created_at)}</span>
+                      </div>
+                      <span className="text-neutral-300 dark:text-neutral-700">•</span>
+                      <span className="inline-flex items-center gap-1 font-medium text-neutral-600 dark:text-neutral-400">
+                        <Tag className="size-3 text-neutral-400" />
+                        {inv.category || "General"}
+                      </span>
                     </div>
                   </div>
                   <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200">
@@ -754,6 +834,7 @@ export default function InversionesPage() {
               <thead className="bg-neutral-50/80 dark:bg-neutral-950/50 border-b border-neutral-200/70 dark:border-neutral-800/70 text-neutral-500 uppercase tracking-wider font-semibold">
                 <tr>
                   <th className="py-3 px-4">Producto</th>
+                  <th className="py-3 px-4">Categoría</th>
                   <th className="py-3 px-4">Fecha</th>
                   <th className="py-3 px-4">Inversión (VES)</th>
                   <th className="py-3 px-4">Tasa BCV</th>
@@ -777,6 +858,12 @@ export default function InversionesPage() {
                           {inv.notes}
                         </span>
                       )}
+                    </td>
+                    <td className="py-3 px-4 whitespace-nowrap">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">
+                        <Tag className="size-2.5" />
+                        {inv.category || "General"}
+                      </span>
                     </td>
                     <td className="py-3 px-4 text-neutral-500 whitespace-nowrap">
                       {formatDate(inv.created_at)}
@@ -860,18 +947,60 @@ export default function InversionesPage() {
               </div>
             )}
 
-            {/* Row 1: Nombre del Producto + Observaciones */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Row 1: Nombre del Producto + Categoría + Observaciones */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="space-y-1.5">
                 <Label htmlFor="product">Nombre del Producto o Lote</Label>
                 <Input
                   id="product"
-                  placeholder="Ej. Audífonos Bluetooth Pro (Lote 50 uds)"
+                  placeholder="Ej. Audífonos Bluetooth Pro (50 uds)"
                   value={productName}
                   onChange={(e) => setProductName(e.target.value)}
                   className="rounded-xl"
                   required
                 />
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="category">Categoría</Label>
+                  <span className="text-[10px] text-neutral-400">Escribe o selecciona</span>
+                </div>
+                <div className="relative">
+                  <Tag className="absolute left-3 top-2.5 size-3.5 text-neutral-400" />
+                  <Input
+                    id="category"
+                    list="create-categories-list"
+                    placeholder="Ej. Audio, Smartphones..."
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                    className="pl-8 rounded-xl font-medium"
+                    required
+                  />
+                  <datalist id="create-categories-list">
+                    {availableCategories.map((c) => (
+                      <option key={c} value={c} />
+                    ))}
+                  </datalist>
+                </div>
+                {availableCategories.length > 0 && (
+                  <div className="flex flex-wrap gap-1 pt-0.5">
+                    {availableCategories.slice(0, 4).map((c) => (
+                      <button
+                        type="button"
+                        key={c}
+                        onClick={() => setCategory(c)}
+                        className={`text-[10px] px-2 py-0.5 rounded-md font-medium transition-colors ${
+                          category.toLowerCase() === c.toLowerCase()
+                            ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900"
+                            : "bg-neutral-100 hover:bg-neutral-200 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300"
+                        }`}
+                      >
+                        {c}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="space-y-1.5">
@@ -1073,8 +1202,8 @@ export default function InversionesPage() {
               </div>
             )}
 
-            {/* Row 1: Nombre del Producto + Observaciones */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Row 1: Nombre del Producto + Categoría + Observaciones */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="space-y-1.5">
                 <Label htmlFor="editProduct">Nombre del Producto / Lote</Label>
                 <Input
@@ -1084,6 +1213,48 @@ export default function InversionesPage() {
                   className="rounded-xl"
                   required
                 />
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="editCategory">Categoría</Label>
+                  <span className="text-[10px] text-neutral-400">Escribe o selecciona</span>
+                </div>
+                <div className="relative">
+                  <Tag className="absolute left-3 top-2.5 size-3.5 text-neutral-400" />
+                  <Input
+                    id="editCategory"
+                    list="edit-categories-list"
+                    placeholder="Ej. Audio, Smartphones..."
+                    value={editCategory}
+                    onChange={(e) => setEditCategory(e.target.value)}
+                    className="pl-8 rounded-xl font-medium"
+                    required
+                  />
+                  <datalist id="edit-categories-list">
+                    {availableCategories.map((c) => (
+                      <option key={c} value={c} />
+                    ))}
+                  </datalist>
+                </div>
+                {availableCategories.length > 0 && (
+                  <div className="flex flex-wrap gap-1 pt-0.5">
+                    {availableCategories.slice(0, 4).map((c) => (
+                      <button
+                        type="button"
+                        key={c}
+                        onClick={() => setEditCategory(c)}
+                        className={`text-[10px] px-2 py-0.5 rounded-md font-medium transition-colors ${
+                          editCategory.toLowerCase() === c.toLowerCase()
+                            ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900"
+                            : "bg-neutral-100 hover:bg-neutral-200 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300"
+                        }`}
+                      >
+                        {c}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="space-y-1.5">
@@ -1273,8 +1444,14 @@ export default function InversionesPage() {
           {detailItem && (
             <div className="space-y-4 pt-2">
               <div className="p-4 rounded-2xl bg-neutral-50 dark:bg-neutral-950 border border-neutral-200/80 dark:border-neutral-800">
-                <span className="text-[11px] text-neutral-400 font-semibold uppercase">Producto / Lote</span>
-                <h4 className="text-lg font-bold text-neutral-900 dark:text-white mt-0.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] text-neutral-400 font-semibold uppercase">Producto / Lote</span>
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-neutral-200/70 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-200">
+                    <Tag className="size-3 text-neutral-500 dark:text-neutral-400" />
+                    {detailItem.category || "General"}
+                  </span>
+                </div>
+                <h4 className="text-lg font-bold text-neutral-900 dark:text-white mt-1">
                   {detailItem.product_name}
                 </h4>
                 <div className="flex items-center gap-2 text-xs text-neutral-500 mt-1">

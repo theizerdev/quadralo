@@ -17,8 +17,25 @@ from app.services.bcv import get_current_bcv_rate
 
 router = APIRouter()
 
+@router.get("/categories", response_model=List[str])
+def get_user_categories(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Listar categorías únicas de inversión del usuario para sugerencias de autocompletado y filtros."""
+    query = db.query(Investment.category).filter(Investment.category.isnot(None))
+    if not (current_user.is_superuser or current_user.role == "superadmin"):
+        query = query.filter(Investment.user_id == current_user.id)
+    
+    results = query.distinct().order_by(Investment.category.asc()).all()
+    categories = [r[0].strip() for r in results if r[0] and r[0].strip()]
+    if "General" not in categories:
+        categories.insert(0, "General")
+    return categories
+
 @router.get("/", response_model=List[InvestmentResponse])
 def get_user_investments(
+    category: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -26,6 +43,8 @@ def get_user_investments(
     query = db.query(Investment)
     if not (current_user.is_superuser or current_user.role == "superadmin"):
         query = query.filter(Investment.user_id == current_user.id)
+    if category and category.strip() and category != "Todas":
+        query = query.filter(Investment.category == category.strip())
     return query.order_by(Investment.created_at.desc()).all()
 
 @router.post("/", response_model=InvestmentResponse, status_code=status.HTTP_201_CREATED)
@@ -57,9 +76,12 @@ def create_investment(
     unit_cost_usd = round(total_cost_usd / investment_in.quantity, 4)
     unit_cost_ves = round(unit_cost_usd * investment_in.bcv_rate, 2)
 
+    cat_clean = (investment_in.category or "General").strip() or "General"
+
     new_investment = Investment(
         user_id=current_user.id,
-        product_name=investment_in.product_name,
+        product_name=investment_in.product_name.strip(),
+        category=cat_clean,
         amount_ves=investment_in.amount_ves,
         bcv_rate=investment_in.bcv_rate,
         amount_usd=amount_usd,
@@ -187,7 +209,10 @@ def update_investment(
 
     # Actualizar campos proporcionados
     if investment_in.product_name is not None:
-        investment.product_name = investment_in.product_name
+        investment.product_name = investment_in.product_name.strip()
+    if investment_in.category is not None:
+        cat_clean = investment_in.category.strip()
+        investment.category = cat_clean if cat_clean else "General"
     if investment_in.amount_ves is not None:
         investment.amount_ves = investment_in.amount_ves
     if investment_in.bcv_rate is not None:

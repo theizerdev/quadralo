@@ -89,6 +89,7 @@ def seed_test_data(db: Session = None, clean_previous: bool = True) -> bool:
         investments_catalog = [
             {
                 "product_name": "iPhone 15 Pro 128GB Titanium",
+                "category": "Smartphones",
                 "quantity": 8,
                 "amount_usd": 6800.00,  # $850 c/u
                 "shipping_cost_usd": 120.00,
@@ -97,6 +98,7 @@ def seed_test_data(db: Session = None, clean_previous: bool = True) -> bool:
             },
             {
                 "product_name": "Xiaomi Redmi Note 13 Pro 256GB",
+                "category": "Smartphones",
                 "quantity": 15,
                 "amount_usd": 3150.00,  # $210 c/u
                 "shipping_cost_usd": 75.00,
@@ -105,6 +107,7 @@ def seed_test_data(db: Session = None, clean_previous: bool = True) -> bool:
             },
             {
                 "product_name": "Audífonos Sony WH-1000XM5 ANC",
+                "category": "Audio",
                 "quantity": 10,
                 "amount_usd": 2600.00,  # $260 c/u
                 "shipping_cost_usd": 50.00,
@@ -113,6 +116,7 @@ def seed_test_data(db: Session = None, clean_previous: bool = True) -> bool:
             },
             {
                 "product_name": "Smartwatch Samsung Galaxy Watch 6 44mm",
+                "category": "Wearables",
                 "quantity": 12,
                 "amount_usd": 2160.00,  # $180 c/u
                 "shipping_cost_usd": 40.00,
@@ -121,6 +125,7 @@ def seed_test_data(db: Session = None, clean_previous: bool = True) -> bool:
             },
             {
                 "product_name": "Monitor Gamer ASUS TUF 24\" IPS 165Hz",
+                "category": "Monitores",
                 "quantity": 6,
                 "amount_usd": 840.00,   # $140 c/u
                 "shipping_cost_usd": 90.00,
@@ -129,6 +134,7 @@ def seed_test_data(db: Session = None, clean_previous: bool = True) -> bool:
             },
             {
                 "product_name": "Power Bank Anker 20.000mAh 22.5W",
+                "category": "Accesorios",
                 "quantity": 25,
                 "amount_usd": 600.00,   # $24 c/u
                 "shipping_cost_usd": 35.00,
@@ -137,6 +143,7 @@ def seed_test_data(db: Session = None, clean_previous: bool = True) -> bool:
             },
             {
                 "product_name": "Teclado Mecánico RGB Redragon Kumara K552",
+                "category": "Periféricos",
                 "quantity": 20,
                 "amount_usd": 560.00,   # $28 c/u
                 "shipping_cost_usd": 40.00,
@@ -145,6 +152,7 @@ def seed_test_data(db: Session = None, clean_previous: bool = True) -> bool:
             },
             {
                 "product_name": "Hub USB-C Baseus 8 en 1 HDMI 4K PD 100W",
+                "category": "Accesorios",
                 "quantity": 30,
                 "amount_usd": 540.00,   # $18 c/u
                 "shipping_cost_usd": 30.00,
@@ -168,6 +176,7 @@ def seed_test_data(db: Session = None, clean_previous: bool = True) -> bool:
             inv = Investment(
                 user_id=user.id,
                 product_name=item["product_name"],
+                category=item.get("category", "General"),
                 amount_ves=amount_ves,
                 bcv_rate=current_rate,
                 amount_usd=item["amount_usd"],
