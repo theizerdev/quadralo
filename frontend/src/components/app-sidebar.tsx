@@ -19,6 +19,7 @@ import {
   DollarSign,
   Blocks,
   Mail,
+  Users,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
@@ -37,6 +38,11 @@ const baseNavItems: NavItem[] = [
     title: "Ventas",
     href: "/ventas",
     icon: ShoppingCart,
+  },
+  {
+    title: "Clientes",
+    href: "/clientes",
+    icon: Users,
   },
   {
     title: "Ganancias",

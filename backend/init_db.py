@@ -64,7 +64,7 @@ def create_tables():
     print("[*] Inicializando modelos y creando tablas...")
     try:
         from app.db.database import Base, engine
-        from app.models import user, investment, bcv, sale, integration
+        from app.models import user, investment, bcv, sale, integration, customer
 
         Base.metadata.create_all(bind=engine)
         
@@ -183,10 +183,61 @@ def create_tables():
                         conn.execute(text("ALTER TABLE sales ADD COLUMN debt_amount_usd FLOAT NOT NULL DEFAULT 0.0;"))
                         conn.execute(text("ALTER TABLE sales ADD COLUMN debt_amount_ves FLOAT NOT NULL DEFAULT 0.0;"))
                         conn.execute(text("ALTER TABLE sales ADD COLUMN due_date DATETIME NULL;"))
-                    # Inicializar ventas históricas como 100% pagadas
-                    conn.execute(text("UPDATE sales SET paid_amount_usd = total_income_usd, paid_amount_ves = total_income_ves, debt_amount_usd = 0.0, debt_amount_ves = 0.0, payment_status = 'paid' WHERE total_income_usd > 0;"))
+                if "customer_phone" not in columns_sales:
+                    print("[*] Aplicando actualizacion: agregando columna 'customer_phone' a 'sales'...")
+                    if is_mysql:
+                        conn.execute(text("ALTER TABLE sales ADD COLUMN customer_phone VARCHAR(50) NULL AFTER customer_name;"))
+                    else:
+                        conn.execute(text("ALTER TABLE sales ADD COLUMN customer_phone VARCHAR(50) NULL;"))
                     conn.commit()
-                    print("[OK] Columnas de cuentas por cobrar agregadas y sincronizadas exitosamente en 'sales'.")
+                    print("[OK] Columna 'customer_phone' agregada exitosamente a 'sales'.")
+
+                if "customer_id" not in columns_sales:
+                    print("[*] Aplicando actualizacion: agregando columna 'customer_id' a 'sales'...")
+                    if is_mysql:
+                        conn.execute(text("ALTER TABLE sales ADD COLUMN customer_id VARCHAR(36) NULL AFTER due_date;"))
+                    else:
+                        conn.execute(text("ALTER TABLE sales ADD COLUMN customer_id VARCHAR(36) NULL;"))
+                    conn.commit()
+                    print("[OK] Columna 'customer_id' agregada exitosamente a 'sales'.")
+
+        # Migración automática para investments (min_stock_alert)
+        if "investments" in tables:
+            columns_inv = [col["name"] for col in inspector.get_columns("investments")]
+            with engine.connect() as conn:
+                if "min_stock_alert" not in columns_inv:
+                    print("[*] Aplicando actualizacion: agregando columna 'min_stock_alert' a 'investments'...")
+                    if is_mysql:
+                        conn.execute(text("ALTER TABLE investments ADD COLUMN min_stock_alert INT NOT NULL DEFAULT 3 AFTER initial_quantity;"))
+                    else:
+                        conn.execute(text("ALTER TABLE investments ADD COLUMN min_stock_alert INT NOT NULL DEFAULT 3;"))
+                    conn.commit()
+                    print("[OK] Columna 'min_stock_alert' agregada exitosamente a 'investments'.")
+
+        # Poblar clientes únicos en la tabla customers a partir de las ventas existentes
+        if "customers" in tables:
+            with engine.connect() as conn:
+                try:
+                    cust_count = conn.execute(text("SELECT COUNT(*) FROM customers;")).scalar()
+                    if cust_count == 0:
+                        print("[*] Sincronizando clientes unicos a partir de las ventas existentes...")
+                        import uuid
+                        existing_sales = conn.execute(text("SELECT DISTINCT user_id, customer_name FROM sales WHERE customer_name IS NOT NULL AND customer_name != '';")).fetchall()
+                        for s_row in existing_sales:
+                            u_id, c_name = s_row[0], s_row[1]
+                            c_id = str(uuid.uuid4())
+                            conn.execute(
+                                text("INSERT INTO customers (id, user_id, name, created_at, updated_at) VALUES (:cid, :uid, :name, NOW(), NOW());"),
+                                {"cid": c_id, "uid": u_id, "name": c_name}
+                            )
+                            conn.execute(
+                                text("UPDATE sales SET customer_id = :cid WHERE user_id = :uid AND customer_name = :name;"),
+                                {"cid": c_id, "uid": u_id, "name": c_name}
+                            )
+                        conn.commit()
+                        print("[OK] Clientes unicos migrados y vinculados exitosamente a sus ventas.")
+                except Exception as e:
+                    print(f"[*] Advertencia sincronizando clientes iniciales: {e}")
 
         print(f"[OK] Tablas registradas exitosamente en la base de datos:")
         for t in tables:

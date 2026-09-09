@@ -46,13 +46,16 @@ class Sale(Base):
     debt_amount_ves = Column(Float, nullable=False, default=0.0)
     due_date = Column(DateTime, nullable=True)                      # Fecha límite de cobro para créditos
 
+    customer_id = Column(String(36), ForeignKey("customers.id", ondelete="SET NULL"), nullable=True, index=True)
     customer_name = Column(String(255), nullable=True)
+    customer_phone = Column(String(50), nullable=True)
     notes = Column(Text, nullable=True)
 
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     user = relationship("User", backref="sales")
     investment = relationship("Investment", backref="sales")
+    customer = relationship("Customer", back_populates="sales")
     payments = relationship("SalePayment", back_populates="sale", cascade="all, delete-orphan", order_by="SalePayment.created_at.asc()")
 
 

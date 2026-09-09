@@ -44,6 +44,8 @@ export default function AppLayout({
     breadcrumbs.push({ title: "Inversión", href: "/inversiones" });
   } else if (pathname?.startsWith("/ventas")) {
     breadcrumbs.push({ title: "Ventas", href: "/ventas" });
+  } else if (pathname?.startsWith("/clientes")) {
+    breadcrumbs.push({ title: "Clientes & Cobranzas", href: "/clientes" });
   } else if (pathname?.startsWith("/ganancias")) {
     breadcrumbs.push({ title: "Ganancias", href: "/ganancias" });
   } else if (pathname?.startsWith("/bcv")) {

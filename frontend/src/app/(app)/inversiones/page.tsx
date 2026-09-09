@@ -47,6 +47,8 @@ interface Investment {
   amount_usd: number;
   quantity: number;
   initial_quantity?: number;
+  min_stock_alert?: number;
+  stock_status?: string;
   shipping_cost_ves: number;
   shipping_cost_usd: number;
   total_cost_usd: number;
@@ -66,6 +68,8 @@ interface Summary {
   total_shipping_ves?: number;
   investments_count: number;
   current_bcv_rate: number;
+  low_stock_count?: number;
+  out_of_stock_count?: number;
 }
 
 export default function InversionesPage() {
@@ -79,6 +83,7 @@ export default function InversionesPage() {
   const [sortBy, setSortBy] = useState<"date_desc" | "date_asc" | "amount_desc" | "cost_desc">("date_desc");
   const [categories, setCategories] = useState<string[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>("Todas");
+  const [stockStatusFilter, setStockStatusFilter] = useState<"all" | "low_stock" | "out_of_stock" | "in_stock">("all");
 
   // Create Modal states
   const [openCreateModal, setOpenCreateModal] = useState(false);
@@ -88,6 +93,7 @@ export default function InversionesPage() {
   const [amountVes, setAmountVes] = useState("");
   const [bcvRate, setBcvRate] = useState("75.50");
   const [quantity, setQuantity] = useState("1");
+  const [minStockAlert, setMinStockAlert] = useState("3");
   const [shippingCostVes, setShippingCostVes] = useState("0");
   const [notes, setNotes] = useState("");
   const [createError, setCreateError] = useState<string | null>(null);
@@ -101,9 +107,21 @@ export default function InversionesPage() {
   const [editAmountVes, setEditAmountVes] = useState("");
   const [editBcvRate, setEditBcvRate] = useState("");
   const [editQuantity, setEditQuantity] = useState("");
+  const [editMinStockAlert, setEditMinStockAlert] = useState("3");
   const [editShippingCostVes, setEditShippingCostVes] = useState("");
   const [editNotes, setEditNotes] = useState("");
   const [editError, setEditError] = useState<string | null>(null);
+
+  // Reorder Modal states
+  const [openReorderModal, setOpenReorderModal] = useState(false);
+  const [reorderItem, setReorderItem] = useState<Investment | null>(null);
+  const [reorderQuantity, setReorderQuantity] = useState("10");
+  const [reorderBcvRate, setReorderBcvRate] = useState("");
+  const [reorderAmountVes, setReorderAmountVes] = useState("");
+  const [reorderShippingVes, setReorderShippingVes] = useState("0");
+  const [reorderMinStock, setReorderMinStock] = useState("3");
+  const [reorderNotes, setReorderNotes] = useState("");
+  const [submittingReorder, setSubmittingReorder] = useState(false);
 
   // Detail Modal states
   const [openDetailModal, setOpenDetailModal] = useState(false);
@@ -212,6 +230,7 @@ export default function InversionesPage() {
           amount_ves: numAmountVes,
           bcv_rate: numBcvRate,
           quantity: numQuantity,
+          min_stock_alert: parseInt(minStockAlert) || 3,
           shipping_cost_ves: numShippingVes,
           shipping_cost_usd: liveShippingUsd,
           notes: notes.trim() || undefined,
@@ -225,6 +244,7 @@ export default function InversionesPage() {
       setCategory("General");
       setAmountVes("");
       setQuantity("1");
+      setMinStockAlert("3");
       setShippingCostVes("0");
       setNotes("");
       setOpenCreateModal(false);
@@ -245,6 +265,7 @@ export default function InversionesPage() {
     setEditAmountVes(inv.amount_ves.toString());
     setEditBcvRate(inv.bcv_rate.toString());
     setEditQuantity((inv.initial_quantity || inv.quantity).toString());
+    setEditMinStockAlert((inv.min_stock_alert || 3).toString());
     const vesShipping = inv.shipping_cost_ves !== undefined 
       ? inv.shipping_cost_ves 
       : roundToTwo(inv.shipping_cost_usd * inv.bcv_rate);
@@ -294,6 +315,7 @@ export default function InversionesPage() {
           amount_ves: editNumAmountVes,
           bcv_rate: editNumBcvRate,
           quantity: editNumQuantity,
+          min_stock_alert: parseInt(editMinStockAlert) || 3,
           shipping_cost_ves: editNumShippingVes,
           shipping_cost_usd: editLiveShippingUsd,
           notes: editNotes.trim() || undefined,
@@ -313,6 +335,60 @@ export default function InversionesPage() {
       notify.error("Error al actualizar", err.message || "No se pudo guardar la modificación.");
     } finally {
       setSubmittingEdit(false);
+    }
+  };
+
+  // --- REORDER MODAL HANDLERS ---
+  const handleOpenReorder = (inv: Investment) => {
+    setReorderItem(inv);
+    setReorderQuantity((inv.initial_quantity || 10).toString());
+    const rate = summary?.current_bcv_rate ? summary.current_bcv_rate.toString() : inv.bcv_rate.toString();
+    setReorderBcvRate(rate);
+    const rateNum = parseFloat(rate) || inv.bcv_rate || 75.5;
+    const estQty = inv.initial_quantity || 10;
+    const estTotalUsd = inv.unit_cost_usd * estQty;
+    setReorderAmountVes((estTotalUsd * rateNum).toFixed(2));
+    setReorderShippingVes("0");
+    setReorderMinStock((inv.min_stock_alert || 3).toString());
+    setReorderNotes(`Reorden de lote anterior (${inv.id.slice(0, 8)})`);
+    setOpenReorderModal(true);
+  };
+
+  const handleConfirmReorder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reorderItem) return;
+    const q = parseInt(reorderQuantity);
+    if (isNaN(q) || q <= 0) {
+      notify.warning("Cantidad requerida", "La cantidad debe ser mayor a 0.");
+      return;
+    }
+
+    try {
+      setSubmittingReorder(true);
+      await apiFetch<Investment>(`/investments/${reorderItem.id}/reorder`, {
+        method: "POST",
+        body: JSON.stringify({
+          quantity: q,
+          bcv_rate: parseFloat(reorderBcvRate) || undefined,
+          amount_ves: parseFloat(reorderAmountVes) || undefined,
+          shipping_cost_ves: parseFloat(reorderShippingVes) || 0,
+          min_stock_alert: parseInt(reorderMinStock) || 3,
+          notes: reorderNotes.trim() || undefined,
+        }),
+      });
+
+      notify.success(
+        "¡Lote Reabastecido!",
+        `Se registró un nuevo lote de ${q} unidades para "${reorderItem.product_name}".`
+      );
+
+      setOpenReorderModal(false);
+      setReorderItem(null);
+      await loadData();
+    } catch (err: any) {
+      notify.error("Error al reabastecer", err.message || "No se pudo procesar el reorden.");
+    } finally {
+      setSubmittingReorder(false);
     }
   };
 
@@ -360,6 +436,17 @@ export default function InversionesPage() {
       const matchesCategory =
         selectedCategory === "Todas" ||
         currentCat.toLowerCase() === selectedCategory.toLowerCase();
+
+      // Filtro de estado de inventario / stock
+      if (stockStatusFilter === "low_stock") {
+        const minAlert = inv.min_stock_alert ?? 3;
+        if (!(inv.quantity > 0 && inv.quantity <= minAlert)) return false;
+      } else if (stockStatusFilter === "out_of_stock") {
+        if (inv.quantity > 0) return false;
+      } else if (stockStatusFilter === "in_stock") {
+        const minAlert = inv.min_stock_alert ?? 3;
+        if (inv.quantity <= minAlert) return false;
+      }
 
       const q = searchQuery.toLowerCase();
       const matchProduct = inv.product_name.toLowerCase().includes(q);
@@ -444,6 +531,47 @@ export default function InversionesPage() {
           </Button>
         </div>
       </div>
+
+      {/* Stock Replenishment Alert Banner */}
+      {((summary?.low_stock_count ?? 0) > 0 || (summary?.out_of_stock_count ?? 0) > 0) && (
+        <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-300 dark:border-amber-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-amber-500 text-white shrink-0">
+              <AlertTriangle className="size-5" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-amber-900 dark:text-amber-200">
+                Alerta de Inventario: Productos por Agotarse o Sin Stock
+              </h3>
+              <p className="text-xs text-amber-700 dark:text-amber-300/90 mt-0.5">
+                Tienes{" "}
+                <strong>{summary?.out_of_stock_count ?? 0} lote(s) agotados</strong> y{" "}
+                <strong>{summary?.low_stock_count ?? 0} con stock mínimo</strong>. Reordena a tiempo para no perder ventas.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 self-end sm:self-center">
+            {stockStatusFilter !== "all" ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setStockStatusFilter("all")}
+                className="h-8 text-xs border-amber-300 dark:border-amber-800 bg-white/80 dark:bg-neutral-900"
+              >
+                Ver Todos
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                onClick={() => setStockStatusFilter("low_stock")}
+                className="h-8 text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white gap-1.5 shadow-sm"
+              >
+                Filtrar Stock Bajo ({summary?.low_stock_count ?? 0})
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* KPI Cards Row (Material Design 3 Styling) */}
       <div className="grid auto-rows-min gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
@@ -560,6 +688,57 @@ export default function InversionesPage() {
             </span>
           </div>
         </div>
+      </div>
+
+      {/* Stock Status Quick Filters */}
+      <div className="flex items-center gap-1.5 p-1 bg-neutral-100 dark:bg-neutral-800/80 rounded-xl w-fit">
+        <button
+          type="button"
+          onClick={() => setStockStatusFilter("all")}
+          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+            stockStatusFilter === "all"
+              ? "bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white shadow-xs font-semibold"
+              : "text-neutral-500 hover:text-neutral-900 dark:hover:text-white"
+          }`}
+        >
+          Todos ({investments.length})
+        </button>
+        <button
+          type="button"
+          onClick={() => setStockStatusFilter("low_stock")}
+          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
+            stockStatusFilter === "low_stock"
+              ? "bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 shadow-xs font-semibold border border-amber-200 dark:border-amber-900"
+              : "text-neutral-500 hover:text-neutral-900 dark:hover:text-white"
+          }`}
+        >
+          <span className="size-2 rounded-full bg-amber-500 inline-block" />
+          Stock Bajo ({summary?.low_stock_count ?? 0})
+        </button>
+        <button
+          type="button"
+          onClick={() => setStockStatusFilter("out_of_stock")}
+          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
+            stockStatusFilter === "out_of_stock"
+              ? "bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-400 shadow-xs font-semibold border border-rose-200 dark:border-rose-900"
+              : "text-neutral-500 hover:text-neutral-900 dark:hover:text-white"
+          }`}
+        >
+          <span className="size-2 rounded-full bg-rose-500 inline-block" />
+          Agotados ({summary?.out_of_stock_count ?? 0})
+        </button>
+        <button
+          type="button"
+          onClick={() => setStockStatusFilter("in_stock")}
+          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
+            stockStatusFilter === "in_stock"
+              ? "bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 shadow-xs font-semibold border border-emerald-200 dark:border-emerald-900"
+              : "text-neutral-500 hover:text-neutral-900 dark:hover:text-white"
+          }`}
+        >
+          <span className="size-2 rounded-full bg-emerald-500 inline-block" />
+          En Stock
+        </button>
       </div>
 
       {/* Category Filter Pills Bar */}
@@ -722,19 +901,22 @@ export default function InversionesPage() {
                     </div>
                   </div>
                   {inv.quantity <= 0 ? (
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-rose-100 dark:bg-rose-950/80 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-900">
+                      <span className="size-1.5 rounded-full bg-rose-500 animate-pulse" />
                       Agotado (0 uds)
                     </span>
-                  ) : inv.quantity < (inv.initial_quantity || inv.quantity) ? (
+                  ) : inv.quantity <= (inv.min_stock_alert ?? 3) ? (
                     <span
-                      className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300"
-                      title={`Lote inicial: ${inv.initial_quantity || inv.quantity} uds | Vendidas: ${(inv.initial_quantity || inv.quantity) - inv.quantity} uds`}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-900"
+                      title={`Alerta de stock mínimo fijada en ${inv.min_stock_alert ?? 3} uds`}
                     >
-                      {inv.quantity} de {inv.initial_quantity || inv.quantity} uds
+                      <span className="size-1.5 rounded-full bg-amber-500" />
+                      Stock Bajo ({inv.quantity} de mín. {inv.min_stock_alert ?? 3})
                     </span>
                   ) : (
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200">
-                      {inv.quantity} uds
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300">
+                      <span className="size-1.5 rounded-full bg-emerald-500" />
+                      {inv.quantity} de {inv.initial_quantity || inv.quantity} uds
                     </span>
                   )}
                 </div>
@@ -802,6 +984,17 @@ export default function InversionesPage() {
 
               {/* Card Action Footer */}
               <div className="mt-4 pt-3 border-t border-neutral-100 dark:border-neutral-800 flex items-center justify-end gap-1.5">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleOpenReorder(inv)}
+                  className="h-8 px-2.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400 border-emerald-300 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 rounded-lg gap-1"
+                  title="Reabastecer con un nuevo lote"
+                >
+                  <RefreshCw className="size-3 text-emerald-600" />
+                  <span>Reordenar</span>
+                </Button>
+
                 <Button
                   variant="ghost"
                   size="sm"
@@ -903,26 +1096,34 @@ export default function InversionesPage() {
                     <td className="py-3 px-4">
                       {inv.quantity <= 0 ? (
                         <div>
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-900">
+                            <span className="size-1.5 rounded-full bg-rose-500 animate-pulse" />
                             Agotado
                           </span>
                           <div className="text-[10px] text-neutral-400 mt-0.5">
                             Lote: {inv.initial_quantity || inv.quantity} uds
                           </div>
                         </div>
-                      ) : inv.quantity < (inv.initial_quantity || inv.quantity) ? (
+                      ) : inv.quantity <= (inv.min_stock_alert ?? 3) ? (
                         <div>
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-900">
+                            <span className="size-1.5 rounded-full bg-amber-500" />
+                            {inv.quantity} disp. (Bajo)
+                          </span>
+                          <div className="text-[10px] text-neutral-400 mt-0.5">
+                            mínimo {inv.min_stock_alert ?? 3} uds
+                          </div>
+                        </div>
+                      ) : (
+                        <div>
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300">
+                            <span className="size-1.5 rounded-full bg-emerald-500" />
                             {inv.quantity} disp.
                           </span>
                           <div className="text-[10px] text-neutral-400 mt-0.5">
                             de {inv.initial_quantity || inv.quantity} uds
                           </div>
                         </div>
-                      ) : (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200">
-                          {inv.quantity} uds
-                        </span>
                       )}
                     </td>
                     <td className="py-3 px-4 text-neutral-700 dark:text-neutral-300 font-medium">
@@ -944,6 +1145,13 @@ export default function InversionesPage() {
                     </td>
                     <td className="py-3 px-4 text-right whitespace-nowrap">
                       <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={() => handleOpenReorder(inv)}
+                          className="p-1.5 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 rounded-lg transition-colors md-ripple"
+                          title="Reordenar Lote"
+                        >
+                          <RefreshCw className="size-3.5" />
+                        </button>
                         <button
                           onClick={() => handleOpenDetail(inv)}
                           className="p-1.5 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg transition-colors md-ripple"
@@ -1061,8 +1269,8 @@ export default function InversionesPage() {
               </div>
             </div>
 
-            {/* Row 2: 4 Inputs Financieros alineados */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {/* Row 2: 5 Inputs Financieros e Inventario alineados */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
               {/* Monto Invertido en Bolívares */}
               <div className="space-y-1.5">
                 <Label htmlFor="amountVes">Inversión (VES)</Label>
@@ -1074,7 +1282,7 @@ export default function InversionesPage() {
                     id="amountVes"
                     type="number"
                     step="0.01"
-                    placeholder="0.00"
+                    placeholder="1500.00"
                     className="pl-9 font-semibold rounded-xl"
                     value={amountVes}
                     onChange={(e) => setAmountVes(e.target.value)}
@@ -1120,6 +1328,26 @@ export default function InversionesPage() {
                     value={quantity}
                     onChange={(e) => setQuantity(e.target.value)}
                     required
+                  />
+                </div>
+              </div>
+
+              {/* Alerta Stock Mínimo */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="minStockAlert">Alerta Stock Mín.</Label>
+                  <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">Uds</span>
+                </div>
+                <div className="relative">
+                  <AlertTriangle className="absolute left-3 top-2.5 size-3.5 text-neutral-400" />
+                  <Input
+                    id="minStockAlert"
+                    type="number"
+                    min="0"
+                    placeholder="3"
+                    className="pl-8 font-semibold rounded-xl"
+                    value={minStockAlert}
+                    onChange={(e) => setMinStockAlert(e.target.value)}
                   />
                 </div>
               </div>
@@ -1315,8 +1543,8 @@ export default function InversionesPage() {
               </div>
             </div>
 
-            {/* Row 2: 4 Inputs Financieros alineados */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {/* Row 2: 5 Inputs Financieros e Inventario alineados */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
               {/* Monto Invertido en Bolívares */}
               <div className="space-y-1.5">
                 <Label htmlFor="editAmountVes">Inversión (VES)</Label>
@@ -1373,6 +1601,26 @@ export default function InversionesPage() {
                     value={editQuantity}
                     onChange={(e) => setEditQuantity(e.target.value)}
                     required
+                  />
+                </div>
+              </div>
+
+              {/* Alerta Stock Mínimo */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="editMinStockAlert">Alerta Stock Mín.</Label>
+                  <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">Uds</span>
+                </div>
+                <div className="relative">
+                  <AlertTriangle className="absolute left-3 top-2.5 size-3.5 text-neutral-400" />
+                  <Input
+                    id="editMinStockAlert"
+                    type="number"
+                    min="0"
+                    placeholder="3"
+                    className="pl-8 font-semibold rounded-xl"
+                    value={editMinStockAlert}
+                    onChange={(e) => setEditMinStockAlert(e.target.value)}
                   />
                 </div>
               </div>
@@ -1665,6 +1913,186 @@ export default function InversionesPage() {
               {deleting ? "Eliminando..." : "Sí, Eliminar Inversión"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ================= MODAL 5: REORDEN DE INVENTARIO / REABASTECIMIENTO ================= */}
+      <Dialog open={openReorderModal} onOpenChange={setOpenReorderModal}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <div className="flex items-center gap-2">
+              <div className="p-2 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                <RefreshCw className="size-5" />
+              </div>
+              <div>
+                <DialogTitle className="text-lg">Reordenar / Reabastecer Inventario</DialogTitle>
+                <DialogDescription>
+                  Crea un nuevo lote para este producto manteniendo su categoría y calculando costos a la tasa actual.
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+
+          {reorderItem && (
+            <form onSubmit={handleConfirmReorder} className="space-y-4 pt-1">
+              <div className="p-3.5 rounded-2xl bg-neutral-50 dark:bg-neutral-900 border border-neutral-200/80 dark:border-neutral-800 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-neutral-500 font-medium">Producto a Reordenar:</span>
+                  <span className="text-[11px] px-2 py-0.5 rounded-full bg-neutral-200/80 dark:bg-neutral-800 font-semibold">
+                    {reorderItem.category || "General"}
+                  </span>
+                </div>
+                <div className="text-base font-bold text-neutral-900 dark:text-white">
+                  {reorderItem.product_name}
+                </div>
+                <div className="text-xs text-neutral-500 flex items-center justify-between pt-1">
+                  <span>Costo unitario anterior: <strong>${reorderItem.unit_cost_usd.toFixed(2)} USD</strong></span>
+                  <span>Stock actual: <strong className={reorderItem.quantity <= 0 ? "text-red-600 dark:text-red-400" : "text-amber-600 dark:text-amber-400"}>{reorderItem.quantity} uds</strong></span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="reorderQuantity">Cantidad a Pedir (Uds)</Label>
+                  <div className="relative">
+                    <Package className="absolute left-3 top-2.5 size-3.5 text-neutral-400" />
+                    <Input
+                      id="reorderQuantity"
+                      type="number"
+                      min="1"
+                      className="pl-8 font-semibold rounded-xl"
+                      value={reorderQuantity}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setReorderQuantity(val);
+                        const q = parseInt(val) || 0;
+                        const rate = parseFloat(reorderBcvRate) || summary?.current_bcv_rate || 1;
+                        const estUsd = q * reorderItem.unit_cost_usd;
+                        setReorderAmountVes((estUsd * rate).toFixed(2));
+                      }}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="reorderMinStock">Alerta Stock Mínimo</Label>
+                  <div className="relative">
+                    <AlertTriangle className="absolute left-3 top-2.5 size-3.5 text-neutral-400" />
+                    <Input
+                      id="reorderMinStock"
+                      type="number"
+                      min="0"
+                      className="pl-8 font-semibold rounded-xl"
+                      value={reorderMinStock}
+                      onChange={(e) => setReorderMinStock(e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="reorderBcvRate">Tasa BCV Aplicada</Label>
+                  <div className="relative">
+                    <DollarSign className="absolute left-3 top-2.5 size-3.5 text-neutral-400" />
+                    <Input
+                      id="reorderBcvRate"
+                      type="number"
+                      step="0.01"
+                      className="pl-8 font-semibold rounded-xl"
+                      value={reorderBcvRate}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setReorderBcvRate(val);
+                        const rate = parseFloat(val) || 1;
+                        const q = parseInt(reorderQuantity) || 0;
+                        const estUsd = q * reorderItem.unit_cost_usd;
+                        setReorderAmountVes((estUsd * rate).toFixed(2));
+                      }}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="reorderAmountVes">Inversión Estimada (VES)</Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2.5 text-xs text-neutral-400 font-bold">Bs.</span>
+                    <Input
+                      id="reorderAmountVes"
+                      type="number"
+                      step="0.01"
+                      className="pl-9 font-semibold rounded-xl"
+                      value={reorderAmountVes}
+                      onChange={(e) => setReorderAmountVes(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="reorderShippingVes">Flete / Envío (VES)</Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2.5 text-xs text-neutral-400 font-bold">Bs.</span>
+                    <Input
+                      id="reorderShippingVes"
+                      type="number"
+                      step="0.01"
+                      className="pl-9 font-semibold rounded-xl"
+                      value={reorderShippingVes}
+                      onChange={(e) => setReorderShippingVes(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="reorderNotes">Notas de la Orden</Label>
+                  <Input
+                    id="reorderNotes"
+                    placeholder="Proveedor, factura..."
+                    className="rounded-xl"
+                    value={reorderNotes}
+                    onChange={(e) => setReorderNotes(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <DialogFooter className="gap-2 sm:gap-0 pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setOpenReorderModal(false);
+                    setReorderItem(null);
+                  }}
+                  disabled={submittingReorder}
+                  className="rounded-xl md-ripple"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={submittingReorder}
+                  className="bg-amber-600 hover:bg-amber-700 text-white rounded-xl md-ripple font-medium gap-1.5"
+                >
+                  {submittingReorder ? (
+                    <>
+                      <RefreshCw className="size-3.5 animate-spin" />
+                      Reabasteciendo...
+                    </>
+                  ) : (
+                    <>
+                      <Package className="size-3.5" />
+                      Confirmar Reorden ({reorderQuantity} uds)
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
         </DialogContent>
       </Dialog>
     </div>

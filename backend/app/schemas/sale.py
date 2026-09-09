@@ -38,7 +38,9 @@ class SaleCreate(BaseModel):
     initial_payment_ves: Optional[float] = Field(None, ge=0, description="Abono inicial en VES si es parcial")
     due_date: Optional[datetime] = Field(None, description="Fecha límite de cobro para ventas a crédito")
 
+    customer_id: Optional[str] = Field(None, description="ID del cliente registrado (opcional)")
     customer_name: Optional[str] = Field(None, description="Nombre o identificación del cliente")
+    customer_phone: Optional[str] = Field(None, description="Teléfono del cliente para WhatsApp")
     notes: Optional[str] = Field(None, description="Observaciones o número de comprobante")
 
 class SaleUpdate(BaseModel):
@@ -53,13 +55,16 @@ class SaleUpdate(BaseModel):
     payment_method: Optional[str] = None
     payment_status: Optional[str] = None
     due_date: Optional[datetime] = None
+    customer_id: Optional[str] = None
     customer_name: Optional[str] = None
+    customer_phone: Optional[str] = None
     notes: Optional[str] = None
 
 class SaleResponse(BaseModel):
     id: str
     user_id: str
     investment_id: Optional[str] = None
+    customer_id: Optional[str] = None
     product_name: str
     category: str = "General"
     quantity: int
@@ -82,6 +87,7 @@ class SaleResponse(BaseModel):
     debt_amount_ves: float = 0.0
     due_date: Optional[datetime] = None
     customer_name: Optional[str] = None
+    customer_phone: Optional[str] = None
     notes: Optional[str] = None
     created_at: datetime
     payments: List[SalePaymentResponse] = []
@@ -127,6 +133,31 @@ class PaymentMethodMetric(BaseModel):
     sales_count: int
     share_percent: float
 
+class CategoryProfitMetric(BaseModel):
+    category: str
+    revenue_usd: float
+    revenue_ves: float
+    cost_usd: float
+    cost_ves: float
+    profit_usd: float
+    profit_ves: float
+    margin_percent: float
+    items_sold: int
+    sales_count: int
+    share_percent: float
+
+class CashVsCreditProfit(BaseModel):
+    total_sales_count: int
+    paid_sales_count: int
+    pending_sales_count: int
+    partial_sales_count: int
+    total_revenue_usd: float
+    total_paid_usd: float
+    total_debt_usd: float
+    realized_profit_usd: float
+    pending_profit_usd: float
+    collection_rate_percent: float
+
 class ProductProfitMetric(BaseModel):
     product_name: str
     units_sold: int
@@ -164,6 +195,8 @@ class SalesAnalyticsResponse(BaseModel):
     summary: SalesAnalyticsSummary
     timeline: list[TimelinePoint]
     by_payment_method: list[PaymentMethodMetric]
+    by_category: list[CategoryProfitMetric] = []
+    cash_vs_credit: Optional[CashVsCreditProfit] = None
     top_products: list[ProductProfitMetric]
     profit_tiers: ProfitTiers
     filter_preset: Optional[str] = None

@@ -20,6 +20,7 @@ class Investment(Base):
     amount_usd = Column(Float, nullable=False)          # Equivalente en USD (amount_ves / bcv_rate)
     quantity = Column(Integer, nullable=False)          # Cantidad de productos disponibles en inventario
     initial_quantity = Column(Integer, nullable=False, default=1)  # Tamaño original del lote comprado
+    min_stock_alert = Column(Integer, nullable=False, default=3)   # Umbral para alerta de stock bajo / reorden
     shipping_cost_usd = Column(Float, default=0.0)      # Costo de envío en USD
     total_cost_usd = Column(Float, nullable=False)      # amount_usd + shipping_cost_usd
     unit_cost_usd = Column(Float, nullable=False)       # total_cost_usd / quantity

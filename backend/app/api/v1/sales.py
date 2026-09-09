@@ -7,6 +7,7 @@ from app.db.database import get_db
 from app.models.user import User
 from app.models.investment import Investment
 from app.models.sale import Sale, SalePayment
+from app.models.customer import Customer
 from app.schemas.sale import (
     SaleCreate,
     SaleUpdate,
@@ -19,6 +20,8 @@ from app.schemas.sale import (
     TimelinePoint,
     PaymentMethodMetric,
     ProductProfitMetric,
+    CategoryProfitMetric,
+    CashVsCreditProfit,
     ProfitTiers,
 )
 from app.api.deps import get_current_user
@@ -172,9 +175,43 @@ def create_sale(
             debt_amount_usd = 0.0
             debt_amount_ves = 0.0
 
+    # Vincular o registrar cliente automáticamente
+    customer_id = sale_in.customer_id
+    customer_name = sale_in.customer_name.strip() if sale_in.customer_name else None
+    customer_phone = sale_in.customer_phone.strip() if sale_in.customer_phone else None
+
+    if customer_id:
+        cust = db.query(Customer).filter(Customer.id == customer_id, Customer.user_id == current_user.id).first()
+        if cust:
+            customer_name = cust.name
+            if customer_phone and not cust.phone:
+                cust.phone = customer_phone
+            customer_phone = customer_phone or cust.phone
+    elif customer_name:
+        existing_cust = db.query(Customer).filter(
+            Customer.user_id == current_user.id,
+            Customer.name.ilike(customer_name)
+        ).first()
+        if existing_cust:
+            customer_id = existing_cust.id
+            customer_name = existing_cust.name
+            if customer_phone and not existing_cust.phone:
+                existing_cust.phone = customer_phone
+            customer_phone = customer_phone or existing_cust.phone
+        else:
+            new_cust = Customer(
+                user_id=current_user.id,
+                name=customer_name,
+                phone=customer_phone,
+            )
+            db.add(new_cust)
+            db.flush()
+            customer_id = new_cust.id
+
     new_sale = Sale(
         user_id=current_user.id,
         investment_id=sale_in.investment_id,
+        customer_id=customer_id,
         product_name=sale_in.product_name,
         category=category,
         quantity=sale_in.quantity,
@@ -196,7 +233,8 @@ def create_sale(
         debt_amount_usd=debt_amount_usd,
         debt_amount_ves=debt_amount_ves,
         due_date=sale_in.due_date,
-        customer_name=sale_in.customer_name,
+        customer_name=customer_name,
+        customer_phone=customer_phone,
         notes=sale_in.notes
     )
 
@@ -510,6 +548,86 @@ def get_sales_analytics(
         )
     top_products.sort(key=lambda x: x.profit_usd, reverse=True)
 
+    # Rentabilidad por Categoría
+    cat_dict: Dict[str, Dict] = {}
+    for s in sales:
+        cat_name = (s.category or "General").strip() or "General"
+        if cat_name not in cat_dict:
+            cat_dict[cat_name] = {
+                "revenue_usd": 0.0,
+                "revenue_ves": 0.0,
+                "cost_usd": 0.0,
+                "cost_ves": 0.0,
+                "profit_usd": 0.0,
+                "profit_ves": 0.0,
+                "items_sold": 0,
+                "sales_count": 0,
+            }
+        c = cat_dict[cat_name]
+        c["revenue_usd"] += s.total_income_usd
+        c["revenue_ves"] += s.total_income_ves
+        c["cost_usd"] += s.total_cost_usd
+        c["cost_ves"] += s.total_cost_ves
+        c["profit_usd"] += s.net_profit_usd
+        c["profit_ves"] += s.net_profit_ves
+        c["items_sold"] += s.quantity
+        c["sales_count"] += 1
+
+    by_category: List[CategoryProfitMetric] = []
+    for cat_name, cval in cat_dict.items():
+        c_cost = cval["cost_usd"]
+        c_prof = cval["profit_usd"]
+        c_rev = cval["revenue_usd"]
+        c_margin = round((c_prof / c_cost * 100), 2) if c_cost > 0 else (100.0 if c_rev > 0 else 0.0)
+        c_share = round((c_rev / total_revenue_usd * 100), 2) if total_revenue_usd > 0 else 0.0
+        by_category.append(
+            CategoryProfitMetric(
+                category=cat_name,
+                revenue_usd=round(c_rev, 2),
+                revenue_ves=round(cval["revenue_ves"], 2),
+                cost_usd=round(c_cost, 2),
+                cost_ves=round(cval["cost_ves"], 2),
+                profit_usd=round(c_prof, 2),
+                profit_ves=round(cval["profit_ves"], 2),
+                margin_percent=c_margin,
+                items_sold=cval["items_sold"],
+                sales_count=cval["sales_count"],
+                share_percent=c_share
+            )
+        )
+    by_category.sort(key=lambda x: x.profit_usd, reverse=True)
+
+    # Comparativa Contado vs Crédito (Ganancias Realizadas vs por Cobrar)
+    paid_sales_count = sum(1 for s in sales if s.payment_status == "paid")
+    pending_sales_count = sum(1 for s in sales if s.payment_status == "pending")
+    partial_sales_count = sum(1 for s in sales if s.payment_status == "partial")
+    total_paid_usd = sum(s.paid_amount_usd for s in sales)
+    total_debt_usd = sum(s.debt_amount_usd for s in sales)
+
+    realized_profit_usd = 0.0
+    for s in sales:
+        if s.total_income_usd > 0:
+            ratio = min(1.0, max(0.0, s.paid_amount_usd / s.total_income_usd))
+            realized_profit_usd += (s.net_profit_usd * ratio)
+        else:
+            realized_profit_usd += s.net_profit_usd
+    realized_profit_usd = round(realized_profit_usd, 2)
+    pending_profit_usd = round(net_profit_usd - realized_profit_usd, 2)
+    collection_rate = round((total_paid_usd / total_revenue_usd * 100), 2) if total_revenue_usd > 0 else 100.0
+
+    cash_vs_credit = CashVsCreditProfit(
+        total_sales_count=sales_count,
+        paid_sales_count=paid_sales_count,
+        pending_sales_count=pending_sales_count,
+        partial_sales_count=partial_sales_count,
+        total_revenue_usd=round(total_revenue_usd, 2),
+        total_paid_usd=round(total_paid_usd, 2),
+        total_debt_usd=round(total_debt_usd, 2),
+        realized_profit_usd=realized_profit_usd,
+        pending_profit_usd=pending_profit_usd,
+        collection_rate_percent=collection_rate
+    )
+
     # Niveles de margen
     high_count = sum(1 for s in sales if s.profit_margin_percent >= 50.0)
     med_count = sum(1 for s in sales if 20.0 <= s.profit_margin_percent < 50.0)
@@ -525,6 +643,8 @@ def get_sales_analytics(
         summary=summary,
         timeline=timeline,
         by_payment_method=by_payment_method,
+        by_category=by_category,
+        cash_vs_credit=cash_vs_credit,
         top_products=top_products,
         profit_tiers=profit_tiers,
         filter_preset=preset,
@@ -610,8 +730,21 @@ def update_sale(
         sale.unit_cost_usd = sale_in.unit_cost_usd
     if sale_in.payment_method is not None:
         sale.payment_method = sale_in.payment_method
+    if sale_in.customer_id is not None:
+        sale.customer_id = sale_in.customer_id
+        cust = db.query(Customer).filter(Customer.id == sale_in.customer_id, Customer.user_id == current_user.id).first()
+        if cust:
+            sale.customer_name = cust.name
+            if not sale.customer_phone and cust.phone:
+                sale.customer_phone = cust.phone
     if sale_in.customer_name is not None:
-        sale.customer_name = sale_in.customer_name
+        sale.customer_name = sale_in.customer_name.strip() if sale_in.customer_name else None
+    if sale_in.customer_phone is not None:
+        sale.customer_phone = sale_in.customer_phone.strip() if sale_in.customer_phone else None
+        if sale.customer_id:
+            cust = db.query(Customer).filter(Customer.id == sale.customer_id, Customer.user_id == current_user.id).first()
+            if cust and not cust.phone and sale.customer_phone:
+                cust.phone = sale.customer_phone
     if sale_in.notes is not None:
         sale.notes = sale_in.notes
     if sale_in.due_date is not None:

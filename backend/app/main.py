@@ -2,8 +2,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.db.database import Base, engine
-from app.api.v1 import auth, investments, bcv, sales, integrations
-from app.models import user, investment, bcv as bcv_model, sale, integration as integration_model
+from app.api.v1 import auth, investments, bcv, sales, integrations, customers
+from app.models import user, investment, bcv as bcv_model, sale, integration as integration_model, customer as customer_model
 
 # Create DB tables
 Base.metadata.create_all(bind=engine)
@@ -34,6 +34,7 @@ app.add_middleware(
 app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["auth"])
 app.include_router(investments.router, prefix=f"{settings.API_V1_STR}/investments", tags=["investments"])
 app.include_router(sales.router, prefix=f"{settings.API_V1_STR}/sales", tags=["sales"])
+app.include_router(customers.router, prefix=f"{settings.API_V1_STR}/customers", tags=["customers"])
 app.include_router(bcv.router, prefix=f"{settings.API_V1_STR}/bcv", tags=["bcv"])
 app.include_router(integrations.router, prefix=f"{settings.API_V1_STR}/integrations", tags=["integrations"])
 

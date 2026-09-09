@@ -34,6 +34,8 @@ import {
   Receipt,
   Scale,
   Zap,
+  Tag,
+  Clock,
 } from "lucide-react";
 import Link from "next/link";
 import { ApexOptions } from "apexcharts";
@@ -111,10 +113,39 @@ interface SalesAnalyticsSummary {
   current_bcv_rate: number;
 }
 
+interface CategoryProfitMetric {
+  category: string;
+  revenue_usd: number;
+  revenue_ves: number;
+  cost_usd: number;
+  cost_ves: number;
+  profit_usd: number;
+  profit_ves: number;
+  margin_percent: number;
+  items_sold: number;
+  sales_count: number;
+  share_percent: number;
+}
+
+interface CashVsCreditProfit {
+  total_sales_count: number;
+  paid_sales_count: number;
+  pending_sales_count: number;
+  partial_sales_count: number;
+  total_revenue_usd: number;
+  total_paid_usd: number;
+  total_debt_usd: number;
+  realized_profit_usd: number;
+  pending_profit_usd: number;
+  collection_rate_percent: number;
+}
+
 interface SalesAnalyticsResponse {
   summary: SalesAnalyticsSummary;
   timeline: TimelinePoint[];
   by_payment_method: PaymentMethodMetric[];
+  by_category?: CategoryProfitMetric[];
+  cash_vs_credit?: CashVsCreditProfit;
   top_products: ProductProfitMetric[];
   profit_tiers: ProfitTiers;
   filter_preset?: string;
@@ -527,6 +558,60 @@ export default function GananciasPage() {
       data: productBarProfit,
     },
   ];
+
+  // 5. Chart Options: Category Profit Donut
+  const categoryLabels = analytics?.by_category?.map((c) => c.category) || [];
+  const categorySeries =
+    analytics?.by_category?.map((c) => (currency === "USD" ? c.profit_usd : c.profit_ves)) || [];
+
+  const categoryDonutOptions: ApexOptions = {
+    chart: {
+      type: "donut",
+      height: 280,
+      fontFamily: "inherit",
+      background: "transparent",
+    },
+    labels: categoryLabels,
+    colors: ["#10b981", "#6366f1", "#f59e0b", "#ec4899", "#06b6d4", "#8b5cf6", "#84cc16"],
+    legend: {
+      position: "bottom",
+      labels: { colors: "#94a3b8" },
+      fontSize: "12px",
+    },
+    plotOptions: {
+      pie: {
+        donut: {
+          size: "68%",
+          labels: {
+            show: true,
+            total: {
+              show: true,
+              label: "Ganancia Total",
+              color: "#94a3b8",
+              fontSize: "12px",
+              formatter: () => {
+                const total = categorySeries.reduce((a, b) => a + b, 0);
+                return formatMoney(total);
+              },
+            },
+            value: {
+              color: "#ffffff",
+              fontSize: "16px",
+              fontWeight: 700,
+              formatter: (val) => formatMoney(Number(val)),
+            },
+          },
+        },
+      },
+    },
+    dataLabels: { enabled: false },
+    tooltip: {
+      theme: "dark",
+      y: {
+        formatter: (val) => formatMoney(Number(val)),
+      },
+    },
+  };
 
   // Simulation calculations
   const currentNetProfitUsd = analytics?.summary.net_profit_usd || 0;
@@ -943,6 +1028,190 @@ export default function GananciasPage() {
               <p className="text-xs text-neutral-500">Sin datos de productos.</p>
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Third Charts Row: Category Profitability & Cash vs. Credit Realized Profit */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Left 2 Cols: Category Profitability & Margin Ranking Table */}
+        <div className="relative overflow-hidden rounded-2xl border border-neutral-200/80 bg-white p-5 shadow-xs dark:border-neutral-800 dark:bg-neutral-900/60 lg:col-span-2">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between mb-4">
+            <div>
+              <h2 className="text-base font-bold text-neutral-900 dark:text-white flex items-center gap-2">
+                <Tag className="size-4 text-emerald-500" />
+                Rentabilidad por Categoría de Producto
+              </h2>
+              <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                ¿Qué líneas de producto te dejan más beneficio neto y mejor margen porcentual?
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-1 rounded-md">
+                {analytics?.by_category?.length || 0} categorías
+              </span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-center">
+            {/* Donut Chart: 5 cols */}
+            <div className="md:col-span-5 flex flex-col items-center justify-center">
+              {categoryLabels.length > 0 ? (
+                <div className="w-full">
+                  <Chart options={categoryDonutOptions} series={categorySeries} type="donut" height={260} />
+                </div>
+              ) : (
+                <div className="flex h-56 flex-col items-center justify-center text-center p-4">
+                  <p className="text-xs text-neutral-500">Sin datos de categorías para este período.</p>
+                </div>
+              )}
+            </div>
+
+            {/* Ranking Table: 7 cols */}
+            <div className="md:col-span-7 overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-neutral-100 dark:border-neutral-800 text-[11px] font-semibold text-neutral-400 uppercase tracking-wider">
+                    <th className="pb-2">Categoría</th>
+                    <th className="pb-2 text-right">Vendido</th>
+                    <th className="pb-2 text-right">Ganancia Neta</th>
+                    <th className="pb-2 text-right">Margen</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800/60">
+                  {analytics?.by_category && analytics.by_category.length > 0 ? (
+                    analytics.by_category.map((cat, idx) => (
+                      <tr key={cat.category} className="hover:bg-neutral-50/60 dark:hover:bg-neutral-800/40 transition-colors">
+                        <td className="py-2.5 font-medium text-neutral-900 dark:text-white flex items-center gap-2">
+                          <span className="flex size-5 items-center justify-center rounded-full bg-emerald-500/10 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                            {idx + 1}
+                          </span>
+                          <span className="truncate max-w-[120px]">{cat.category}</span>
+                        </td>
+                        <td className="py-2.5 text-right text-neutral-500">
+                          {cat.items_sold} uds ({formatMoney(currency === "USD" ? cat.revenue_usd : cat.revenue_ves)})
+                        </td>
+                        <td className="py-2.5 text-right font-semibold text-emerald-600 dark:text-emerald-400">
+                          {formatMoney(currency === "USD" ? cat.profit_usd : cat.profit_ves)}
+                        </td>
+                        <td className="py-2.5 text-right">
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                            {cat.margin_percent.toFixed(1)}%
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={4} className="py-6 text-center text-xs text-neutral-400">
+                        No hay datos categorizados aún.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Col: Cash vs. Credit Realized Profit Widget */}
+        <div className="relative overflow-hidden rounded-2xl border border-neutral-200/80 bg-white p-5 shadow-xs dark:border-neutral-800 dark:bg-neutral-900/60 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h2 className="text-base font-bold text-neutral-900 dark:text-white flex items-center gap-2">
+                  <Coins className="size-4 text-emerald-500" />
+                  Contado vs. Créditos
+                </h2>
+                <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                  Ganancia Realizada vs. Ganancia por Cobrar
+                </p>
+              </div>
+            </div>
+
+            {/* Progress Bar Collection Rate */}
+            <div className="mt-2 p-3.5 rounded-xl bg-neutral-50 dark:bg-neutral-950 border border-neutral-100 dark:border-neutral-800/80">
+              <div className="flex items-center justify-between text-xs mb-1.5">
+                <span className="text-neutral-500 font-medium">Tasa de Cobranza / Recaudación:</span>
+                <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                  {analytics?.cash_vs_credit ? `${analytics.cash_vs_credit.collection_rate_percent.toFixed(1)}%` : "100%"}
+                </span>
+              </div>
+              <div className="h-2.5 w-full rounded-full bg-neutral-200 dark:bg-neutral-800 overflow-hidden">
+                <div
+                  className="h-full bg-emerald-500 rounded-full transition-all duration-500"
+                  style={{ width: `${Math.min(100, analytics?.cash_vs_credit?.collection_rate_percent || 100)}%` }}
+                />
+              </div>
+              <p className="mt-2 text-[11px] text-neutral-400">
+                Cobrado: ${analytics?.cash_vs_credit?.total_paid_usd.toFixed(2) || "0.00"} de $
+                {analytics?.cash_vs_credit?.total_revenue_usd.toFixed(2) || "0.00"} facturados
+              </p>
+            </div>
+
+            {/* Comparison Cards */}
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <div className="p-3 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-900/40">
+                <span className="block text-[10px] uppercase font-semibold text-emerald-700 dark:text-emerald-400">
+                  Ganancia Realizada
+                </span>
+                <span className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
+                  ${analytics?.cash_vs_credit?.realized_profit_usd.toFixed(2) || "0.00"}
+                </span>
+                <p className="text-[10px] text-neutral-500 mt-0.5">Efectivo cobrado en caja</p>
+              </div>
+
+              <div className="p-3 rounded-xl bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-900/40">
+                <span className="block text-[10px] uppercase font-semibold text-amber-700 dark:text-amber-400">
+                  Ganancia en Crédito
+                </span>
+                <span className="text-lg font-bold text-amber-600 dark:text-amber-400">
+                  ${analytics?.cash_vs_credit?.pending_profit_usd.toFixed(2) || "0.00"}
+                </span>
+                <p className="text-[10px] text-neutral-500 mt-0.5">Pendiente por cobrar</p>
+              </div>
+            </div>
+
+            {/* Breakdown Pills */}
+            <div className="mt-4 space-y-2 text-xs">
+              <div className="flex items-center justify-between text-neutral-600 dark:text-neutral-400">
+                <span className="flex items-center gap-1.5">
+                  <CheckCircle2 className="size-3.5 text-emerald-500" />
+                  Ventas al Contado (100% Pagadas):
+                </span>
+                <span className="font-semibold text-neutral-900 dark:text-white">
+                  {analytics?.cash_vs_credit?.paid_sales_count || 0}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-neutral-600 dark:text-neutral-400">
+                <span className="flex items-center gap-1.5">
+                  <Clock className="size-3.5 text-amber-500" />
+                  Ventas con Abonos Parciales:
+                </span>
+                <span className="font-semibold text-neutral-900 dark:text-white">
+                  {analytics?.cash_vs_credit?.partial_sales_count || 0}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-neutral-600 dark:text-neutral-400">
+                <span className="flex items-center gap-1.5">
+                  <AlertCircle className="size-3.5 text-rose-500" />
+                  Ventas a Crédito 100% Pendientes:
+                </span>
+                <span className="font-semibold text-neutral-900 dark:text-white">
+                  {analytics?.cash_vs_credit?.pending_sales_count || 0}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 pt-3 border-t border-neutral-100 dark:border-neutral-800 flex items-center justify-between">
+            <span className="text-xs text-neutral-400">Gestión de Cuentas:</span>
+            <Link
+              href="/clientes"
+              className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 flex items-center gap-1"
+            >
+              Ver Deudores & Cobranzas &rarr;
+            </Link>
+          </div>
         </div>
       </div>
 

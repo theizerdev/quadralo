@@ -33,6 +33,8 @@ import {
   Package,
   TrendingDown,
   ArrowDownRight,
+  AlertTriangle,
+  Users,
 } from "lucide-react";
 import { ApexOptions } from "apexcharts";
 
@@ -58,6 +60,17 @@ interface InvestmentSummary {
   total_shipping_ves?: number;
   investments_count: number;
   current_bcv_rate: number;
+  low_stock_count?: number;
+  out_of_stock_count?: number;
+}
+
+interface CustomerKPIs {
+  total_customers: number;
+  debtors_count: number;
+  up_to_date_count: number;
+  total_receivable_usd: number;
+  total_receivable_ves: number;
+  average_ticket_usd: number;
 }
 
 interface TimelinePoint {
@@ -150,6 +163,7 @@ export default function DashboardPage() {
   // Estados de datos
   const [analytics, setAnalytics] = useState<SalesAnalyticsResponse | null>(null);
   const [invSummary, setInvSummary] = useState<InvestmentSummary | null>(null);
+  const [customerKpis, setCustomerKpis] = useState<CustomerKPIs | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -170,13 +184,15 @@ export default function DashboardPage() {
       }
       params.set("group_by", granularity);
 
-      const [analyticsData, investmentData] = await Promise.all([
+      const [analyticsData, investmentData, customersData] = await Promise.all([
         apiFetch<SalesAnalyticsResponse>(`/sales/analytics?${params.toString()}`).catch(() => null),
         apiFetch<InvestmentSummary>(`/investments/summary?${params.toString()}`).catch(() => null),
+        apiFetch<{ kpis: CustomerKPIs }>("/customers/").catch(() => null),
       ]);
 
       if (analyticsData) setAnalytics(analyticsData);
       if (investmentData) setInvSummary(investmentData);
+      if (customersData?.kpis) setCustomerKpis(customersData.kpis);
     } catch (err) {
       console.error("Error al cargar datos del dashboard:", err);
     } finally {
@@ -743,6 +759,62 @@ export default function DashboardPage() {
         </div>
       )}
 
+      {/* 2.5 Alertas Operativas: Stock Mínimo y Cuentas por Cobrar */}
+      {(((invSummary?.low_stock_count ?? 0) > 0 || (invSummary?.out_of_stock_count ?? 0) > 0) || ((customerKpis?.debtors_count ?? 0) > 0)) && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Alerta de Stock Mínimo */}
+          {((invSummary?.low_stock_count ?? 0) > 0 || (invSummary?.out_of_stock_count ?? 0) > 0) && (
+            <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-300 dark:border-amber-800/80 flex items-center justify-between gap-3 shadow-xs">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-amber-500 text-white shrink-0">
+                  <AlertTriangle className="size-5" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-amber-900 dark:text-amber-200">
+                    Alerta de Inventario: Reabastecimiento
+                  </h4>
+                  <p className="text-xs text-amber-700 dark:text-amber-300/90 mt-0.5">
+                    <strong>{invSummary?.out_of_stock_count ?? 0} agotados</strong> y{" "}
+                    <strong>{invSummary?.low_stock_count ?? 0} con stock bajo</strong>.
+                  </p>
+                </div>
+              </div>
+              <Link href="/inversiones" className="shrink-0">
+                <Button size="sm" className="h-8 text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white rounded-xl gap-1">
+                  <span>Reordenar</span>
+                  <ArrowRight className="size-3" />
+                </Button>
+              </Link>
+            </div>
+          )}
+
+          {/* Alerta de Cuentas por Cobrar (Deudores) */}
+          {(customerKpis?.debtors_count ?? 0) > 0 && (
+            <div className="p-4 rounded-2xl bg-blue-500/10 border border-blue-300 dark:border-blue-800/80 flex items-center justify-between gap-3 shadow-xs">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-blue-600 text-white shrink-0">
+                  <Users className="size-5" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-blue-900 dark:text-blue-200">
+                    Cobranzas Pendientes: {customerKpis?.debtors_count} {customerKpis?.debtors_count === 1 ? "Deudor" : "Deudores"}
+                  </h4>
+                  <p className="text-xs text-blue-700 dark:text-blue-300/90 mt-0.5">
+                    Saldo por cobrar: <strong>${(customerKpis?.total_receivable_usd ?? 0).toFixed(2)} USD</strong> (≈ Bs. {(customerKpis?.total_receivable_ves ?? 0).toLocaleString("es-VE", { minimumFractionDigits: 2 })})
+                  </p>
+                </div>
+              </div>
+              <Link href="/clientes" className="shrink-0">
+                <Button size="sm" className="h-8 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-xl gap-1">
+                  <span>Cobrar</span>
+                  <ArrowRight className="size-3" />
+                </Button>
+              </Link>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* 3. Cuadrícula de 4 Tarjetas de Resumen Financiero Ejecutivo (KPIs) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: Resumen de Inversiones */}
@@ -1109,6 +1181,12 @@ export default function DashboardPage() {
           </div>
 
           <div className="flex items-center gap-2">
+            <Link href="/clientes">
+              <Button variant="outline" size="sm" className="rounded-xl text-xs gap-1.5">
+                <Users className="size-3.5" />
+                <span>Clientes</span>
+              </Button>
+            </Link>
             <Link href="/inversiones">
               <Button variant="outline" size="sm" className="rounded-xl text-xs gap-1.5">
                 <Wallet className="size-3.5" />
