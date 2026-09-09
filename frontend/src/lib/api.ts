@@ -27,19 +27,25 @@ export interface RegisterResponse {
   verification_code?: string;
 }
 
-const API_BASE_URL = (
-  (typeof process !== "undefined" && process.env?.NEXT_PUBLIC_API_URL) || ""
-).replace(/\/$/, "");
+function getApiBaseUrl(): string {
+  const envUrl = (
+    (typeof process !== "undefined" && process.env?.NEXT_PUBLIC_API_URL) || "http://127.0.0.1:8001"
+  ).replace(/\/$/, "");
+
+  // Si la URL base ya contiene /api/v1 al final, lo removemos para evitar duplicar /api/v1/api/v1/...
+  return envUrl.replace(/\/api\/v1$/, "");
+}
 
 export async function apiFetch<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
+  const baseUrl = getApiBaseUrl();
   const normalizedEndpoint = endpoint.startsWith("/api/v1")
     ? endpoint
     : `/api/v1${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
 
-  const url = `${API_BASE_URL}${normalizedEndpoint}`;
+  const url = `${baseUrl}${normalizedEndpoint}`;
 
   const headers: Record<string, string> = {
     Accept: "application/json",

@@ -45,6 +45,7 @@ def main():
     backend_cmd = [python_exec, "-m", "uvicorn", "app.main:app", "--reload", "--port", str(backend_port)]
     frontend_env = os.environ.copy()
     frontend_env["PORT"] = str(frontend_port)
+    frontend_env["NEXT_PUBLIC_API_URL"] = f"http://127.0.0.1:{backend_port}/api/v1"
     frontend_cmd = ["npm.cmd", "run", "dev", "--", "-p", str(frontend_port)] if sys.platform == "win32" else ["npm", "run", "dev", "--", "-p", str(frontend_port)]
 
     processes = []
