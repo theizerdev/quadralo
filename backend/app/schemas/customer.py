@@ -44,7 +44,9 @@ class CustomerSummaryItem(BaseModel):
     total_paid_usd: float = 0.0
     total_paid_ves: float = 0.0
     payment_status: str = "up_to_date"  # "up_to_date", "has_debt"
+    has_debt: bool = False
     last_purchase_date: Optional[datetime] = None
+    last_sale_date: Optional[datetime] = None
     created_at: datetime
 
 class CustomersSummaryKPIs(BaseModel):
@@ -53,8 +55,13 @@ class CustomersSummaryKPIs(BaseModel):
     up_to_date_count: int = 0
     total_receivable_usd: float = 0.0
     total_receivable_ves: float = 0.0
+    total_collected_usd: float = 0.0
+    total_collected_ves: float = 0.0
+    collection_rate_percent: float = 100.0
     average_ticket_usd: float = 0.0
+    current_bcv_rate: float = 0.0
 
 class CustomerListResponse(BaseModel):
     kpis: CustomersSummaryKPIs
     customers: List[CustomerSummaryItem]
+    items: Optional[List[CustomerSummaryItem]] = None

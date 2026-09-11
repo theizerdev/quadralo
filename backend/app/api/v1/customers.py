@@ -26,6 +26,7 @@ router = APIRouter()
 @router.get("", response_model=CustomerListResponse)
 def get_customers(
     status_filter: Optional[str] = "all",  # "all", "debtors", "up_to_date"
+    filter_debt: Optional[str] = None,
     search: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -34,6 +35,9 @@ def get_customers(
     Listar directorio de clientes con métricas acumuladas de compras,
     cuentas por cobrar (deudas) y cálculo de KPIs.
     """
+    eff_filter = filter_debt if filter_debt is not None else status_filter
+    eff_filter = eff_filter or "all"
+
     query = db.query(Customer)
     if not (current_user.is_superuser or current_user.role == "superadmin"):
         query = query.filter(Customer.user_id == current_user.id)
@@ -53,6 +57,8 @@ def get_customers(
     items: List[CustomerSummaryItem] = []
     total_receivable_usd = 0.0
     total_receivable_ves = 0.0
+    total_collected_usd = 0.0
+    total_collected_ves = 0.0
     total_spent_overall = 0.0
     total_purchases_overall = 0
     debtors_count = 0
@@ -79,6 +85,8 @@ def get_customers(
         else:
             up_to_date_count += 1
 
+        total_collected_usd += total_paid_usd
+        total_collected_ves += total_paid_ves
         total_spent_overall += total_spent_usd
         total_purchases_overall += sales_count
 
@@ -99,24 +107,32 @@ def get_customers(
             total_paid_usd=round(total_paid_usd, 2),
             total_paid_ves=round(total_paid_ves, 2),
             payment_status=cust_status,
+            has_debt=has_debt,
             last_purchase_date=last_purchase_date,
+            last_sale_date=last_purchase_date,
             created_at=cust.created_at,
         )
 
         # Aplicar filtro de estado
-        if status_filter == "debtors" and not has_debt:
+        if eff_filter == "debtors" and not has_debt:
             continue
-        if status_filter == "up_to_date" and has_debt:
+        if eff_filter == "up_to_date" and has_debt:
             continue
 
         items.append(item)
 
     # Ordenar deudores primero si no hay búsqueda
-    if not search and status_filter == "all":
+    if not search and eff_filter == "all":
         items.sort(key=lambda x: (x.total_debt_usd <= 0, -x.total_debt_usd, x.name.lower()))
 
     total_customers_count = len(all_customers)
     avg_ticket = round(total_spent_overall / total_purchases_overall, 2) if total_purchases_overall > 0 else 0.0
+    collection_rate = (
+        round((total_collected_usd / total_spent_overall) * 100, 1)
+        if total_spent_overall > 0
+        else 100.0
+    )
+    bcv_rate = get_current_bcv_rate(db, current_user.id)
 
     kpis = CustomersSummaryKPIs(
         total_customers=total_customers_count,
@@ -124,10 +140,14 @@ def get_customers(
         up_to_date_count=up_to_date_count,
         total_receivable_usd=round(total_receivable_usd, 2),
         total_receivable_ves=round(total_receivable_ves, 2),
+        total_collected_usd=round(total_collected_usd, 2),
+        total_collected_ves=round(total_collected_ves, 2),
+        collection_rate_percent=collection_rate,
         average_ticket_usd=avg_ticket,
+        current_bcv_rate=round(bcv_rate, 2),
     )
 
-    return CustomerListResponse(kpis=kpis, customers=items)
+    return CustomerListResponse(kpis=kpis, customers=items, items=items)
 
 @router.get("/{customer_id}", response_model=CustomerResponse)
 def get_customer_detail(
