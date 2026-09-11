@@ -191,6 +191,7 @@ DATABASE_URL=mysql+pymysql://root:@127.0.0.1:3307/quadralo?charset=utf8mb4
 
 #### Frontend (`frontend/.env.local`):
 ```ini
+NEXT_PUBLIC_API_URL=http://127.0.0.1:8000/api/v1
 NEXT_PUBLIC_API_URL=http://127.0.0.1:8001/api/v1
 ```
 
@@ -239,6 +240,9 @@ npm run dev
 python dev.py
 ```
 
+- 🌐 **Frontend (Next.js)**: [http://localhost:3000](http://localhost:3000)
+- ⚙️ **Backend API (FastAPI)**: [http://127.0.0.1:8000](http://127.0.0.1:8000)
+- 📖 **Documentación Interactiva Swagger**: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
 - 🌐 **Frontend (Next.js)**: [http://localhost:3001](http://localhost:3001)
 - ⚙️ **Backend API (FastAPI)**: [http://127.0.0.1:8001](http://127.0.0.1:8001)
 - 📖 **Documentación Interactiva Swagger**: [http://127.0.0.1:8001/docs](http://127.0.0.1:8001/docs)

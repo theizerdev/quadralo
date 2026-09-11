@@ -5,6 +5,8 @@ from app.db.database import Base, engine
 from app.api.v1 import auth, investments, bcv, sales, integrations, customers
 from app.models import user, investment, bcv as bcv_model, sale, integration as integration_model, customer as customer_model
 
+# Create DB tables
+Base.metadata.create_all(bind=engine)
 from contextlib import asynccontextmanager
 
 @asynccontextmanager
@@ -17,6 +19,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
+    openapi_url=f"{settings.API_V1_STR}/openapi.json"
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
     lifespan=lifespan
 )

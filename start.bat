@@ -7,6 +7,8 @@ echo ========================================================
 echo         🚀 QUÁDRALO - INICIANDO SISTEMA COMPLETO 🚀
 echo ========================================================
 echo.
+echo [1/2] Backend:  FastAPI en http://127.0.0.1:8000
+echo [2/2] Frontend: Next.js en http://localhost:3000
 echo [1/2] Backend:  FastAPI en http://127.0.0.1:8001
 echo [2/2] Frontend: Next.js en http://localhost:3001
 echo.
