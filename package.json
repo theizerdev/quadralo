@@ -9,6 +9,8 @@
     "dev:backend": "cd backend && (venv\\Scripts\\python -m uvicorn app.main:app --reload --port 8001 || venv/bin/python -m uvicorn app.main:app --reload --port 8001)",
     "dev:frontend": "cd frontend && npm run dev -- -p 3001",
     "init:db": "python dev.py --init-db",
+    "db:migrate": "cd backend && (venv\\Scripts\\alembic upgrade head || venv/bin/alembic upgrade head)",
+    "db:makemigrations": "cd backend && (venv\\Scripts\\alembic revision --autogenerate || venv/bin/alembic revision --autogenerate)",
     "seed": "python dev.py --seed",
     "setup": "npm run install:all && npm run init:db",
     "install:all": "npm install && cd frontend && npm install"

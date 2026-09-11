@@ -44,7 +44,9 @@ import {
   Calculator,
   Info,
   Clock,
+  ScanLine,
 } from "lucide-react";
+import { POSTerminal } from "@/components/pos/POSTerminal";
 
 interface Investment {
   id: string;
@@ -135,6 +137,7 @@ const PAYMENT_METHODS = [
 ];
 
 export default function VentasPage() {
+  const [pageMode, setPageMode] = useState<"pos" | "history">("pos");
   const [sales, setSales] = useState<Sale[]>([]);
   const [investments, setInvestments] = useState<Investment[]>([]);
   const [summary, setSummary] = useState<SaleSummary | null>(null);
@@ -827,8 +830,57 @@ export default function VentasPage() {
   };
 
   return (
-    <div className="flex flex-1 flex-col gap-6">
-      {/* Header */}
+    <div className="flex flex-1 flex-col gap-4">
+      {/* Primary Navigation Toggle: POS Terminal vs Historial */}
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-1 border-b border-neutral-200/80 dark:border-neutral-800/80">
+        <div className="flex items-center gap-1.5 bg-neutral-100 dark:bg-neutral-800/90 p-1 rounded-2xl border border-neutral-200/80 dark:border-neutral-700/80">
+          <button
+            type="button"
+            onClick={() => setPageMode("pos")}
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              pageMode === "pos"
+                ? "bg-white dark:bg-neutral-900 text-emerald-700 dark:text-emerald-400 shadow-sm"
+                : "text-neutral-600 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white"
+            }`}
+          >
+            <ScanLine className="size-4" />
+            <span>Punto de Venta (Terminal POS)</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setPageMode("history")}
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              pageMode === "history"
+                ? "bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white shadow-sm"
+                : "text-neutral-600 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white"
+            }`}
+          >
+            <TrendingUp className="size-4" />
+            <span>Historial, Reportes & Abonos</span>
+          </button>
+        </div>
+
+        {pageMode === "history" && (
+          <Button
+            size="sm"
+            onClick={() => setPageMode("pos")}
+            className="h-9 px-3.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-sm gap-2"
+          >
+            <ScanLine className="size-4" />
+            <span>Abrir Terminal POS</span>
+          </Button>
+        )}
+      </div>
+
+      {pageMode === "pos" ? (
+        <POSTerminal
+          onViewAdmin={() => setPageMode("history")}
+          onSaleCompleted={loadData}
+        />
+      ) : (
+        <div className="flex flex-1 flex-col gap-6">
+          {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
@@ -1565,6 +1617,8 @@ export default function VentasPage() {
               </tbody>
             </table>
           </div>
+        </div>
+      )}
         </div>
       )}
 

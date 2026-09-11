@@ -21,21 +21,83 @@ class SalePaymentResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class SaleItemCreate(BaseModel):
+    investment_id: Optional[str] = Field(None, description="Lote de origen (opcional)")
+    product_name: str = Field(..., min_length=1, description="Nombre del artículo")
+    barcode: Optional[str] = Field(None, description="Código de barras o SKU")
+    category: Optional[str] = Field(default="General", description="Categoría")
+    concepto_tipo: Optional[str] = Field(default="producto", description="producto, servicio, vario")
+    quantity: int = Field(default=1, gt=0, description="Cantidad vendida")
+    unit_cost_usd: Optional[float] = Field(default=0.0, ge=0)
+    unit_price_usd: Optional[float] = Field(None, gt=0)
+    unit_price_ves: Optional[float] = Field(None, gt=0)
+
+class SaleItemResponse(BaseModel):
+    id: str
+    sale_id: str
+    investment_id: Optional[str] = None
+    product_name: str
+    barcode: Optional[str] = None
+    category: str = "General"
+    concepto_tipo: str = "producto"
+    quantity: int = 1
+    unit_cost_usd: float = 0.0
+    unit_cost_ves: float = 0.0
+    total_cost_usd: float = 0.0
+    total_cost_ves: float = 0.0
+    unit_price_usd: float = 0.0
+    unit_price_ves: float = 0.0
+    total_income_usd: float = 0.0
+    total_income_ves: float = 0.0
+    subtotal_usd: Optional[float] = 0.0
+    subtotal_ves: Optional[float] = 0.0
+    net_profit_usd: float = 0.0
+    net_profit_ves: float = 0.0
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class POSCatalogItem(BaseModel):
+    id: str
+    investment_id: Optional[str] = None
+    product_name: str
+    barcode: Optional[str] = None
+    category: str = "General"
+    stock_available: int
+    available_stock: Optional[int] = None
+    unit_cost_usd: float
+    unit_cost_ves: float
+    suggested_price_usd: float
+    suggested_price_ves: float
+    bcv_rate: float
+
 class SaleCreate(BaseModel):
-    investment_id: Optional[str] = Field(None, description="ID del lote de inversión asociado (opcional)")
-    product_name: str = Field(..., min_length=1, description="Nombre del producto vendido")
-    category: Optional[str] = Field(default="General", description="Categoría del producto")
-    quantity: int = Field(..., gt=0, description="Cantidad de unidades vendidas")
+    ticket_code: Optional[str] = Field(None, description="Código de ticket (ej. TKT-100234)")
     bcv_rate: float = Field(..., gt=0, description="Tasa BCV aplicada en la venta")
     
-    unit_cost_usd: Optional[float] = Field(default=0.0, ge=0, description="Costo unitario en USD (si no viene de inversión)")
+    # Soporte Multi-Ítem (Carrito POS)
+    items: Optional[List[SaleItemCreate]] = Field(default=[], description="Lista de artículos del carrito POS")
+    
+    # Soporte retrocompatible para venta unitaria rápida
+    investment_id: Optional[str] = Field(None, description="ID del lote de inversión asociado (opcional)")
+    product_name: Optional[str] = Field(None, description="Nombre del producto vendido (para venta unitaria)")
+    category: Optional[str] = Field(default="General", description="Categoría del producto")
+    quantity: Optional[int] = Field(default=1, gt=0, description="Cantidad de unidades vendidas")
+    unit_cost_usd: Optional[float] = Field(default=0.0, ge=0, description="Costo unitario en USD")
     unit_price_usd: Optional[float] = Field(None, gt=0, description="Precio unitario de venta en USD")
     unit_price_ves: Optional[float] = Field(None, gt=0, description="Precio unitario de venta en VES")
     
+    # Descuentos y subtotales
+    discount_usd: Optional[float] = Field(default=0.0, ge=0, description="Descuento aplicado en USD")
+    discount_ves: Optional[float] = Field(default=0.0, ge=0, description="Descuento aplicado en VES")
+
+    # Métodos y desglose de pagos
     payment_method: str = Field(default="Pago Móvil", description="Método de pago utilizado")
     payment_status: Optional[str] = Field(default="paid", description="Estado del pago: paid, partial, pending")
     initial_payment_usd: Optional[float] = Field(None, ge=0, description="Abono inicial en USD si es parcial")
     initial_payment_ves: Optional[float] = Field(None, ge=0, description="Abono inicial en VES si es parcial")
+    payments: Optional[List[SalePaymentCreate]] = Field(default=[], description="Desglose de líneas de pago mixtas")
     due_date: Optional[datetime] = Field(None, description="Fecha límite de cobro para ventas a crédito")
 
     customer_id: Optional[str] = Field(None, description="ID del cliente registrado (opcional)")
@@ -44,6 +106,7 @@ class SaleCreate(BaseModel):
     notes: Optional[str] = Field(None, description="Observaciones o número de comprobante")
 
 class SaleUpdate(BaseModel):
+    ticket_code: Optional[str] = None
     investment_id: Optional[str] = None
     product_name: Optional[str] = None
     category: Optional[str] = None
@@ -63,6 +126,7 @@ class SaleUpdate(BaseModel):
 class SaleResponse(BaseModel):
     id: str
     user_id: str
+    ticket_code: Optional[str] = None
     investment_id: Optional[str] = None
     customer_id: Optional[str] = None
     product_name: str
@@ -72,6 +136,10 @@ class SaleResponse(BaseModel):
     unit_price_usd: float
     unit_price_ves: float
     bcv_rate: float
+    subtotal_usd: float = 0.0
+    subtotal_ves: float = 0.0
+    discount_usd: float = 0.0
+    discount_ves: float = 0.0
     total_income_usd: float
     total_income_ves: float
     total_cost_usd: float
@@ -90,6 +158,7 @@ class SaleResponse(BaseModel):
     customer_phone: Optional[str] = None
     notes: Optional[str] = None
     created_at: datetime
+    items: List[SaleItemResponse] = []
     payments: List[SalePaymentResponse] = []
 
     class Config:

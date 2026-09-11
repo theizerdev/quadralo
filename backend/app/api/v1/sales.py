@@ -2,11 +2,12 @@ from typing import List, Optional, Dict
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy import or_, desc
 
 from app.db.database import get_db
 from app.models.user import User
 from app.models.investment import Investment
-from app.models.sale import Sale, SalePayment
+from app.models.sale import Sale, SalePayment, SaleItem
 from app.models.customer import Customer
 from app.schemas.sale import (
     SaleCreate,
@@ -15,6 +16,9 @@ from app.schemas.sale import (
     SaleSummary,
     SalePaymentCreate,
     SalePaymentResponse,
+    SaleItemCreate,
+    SaleItemResponse,
+    POSCatalogItem,
     SalesAnalyticsResponse,
     SalesAnalyticsSummary,
     TimelinePoint,
@@ -58,122 +62,91 @@ def get_sales_categories(
         categories = ["General"]
     return sorted(list(set(categories)))
 
+@router.get("/pos/catalog", response_model=List[POSCatalogItem])
+def get_pos_catalog(
+    search: Optional[str] = None,
+    category: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Catálogo rápido para la Terminal POS con búsqueda por código de barras o nombre."""
+    query = db.query(Investment).filter(Investment.user_id == current_user.id, Investment.quantity > 0)
+    if category and category.strip() and category.strip().lower() != "todas":
+        query = query.filter(Investment.category.ilike(category.strip()))
+    if search and search.strip():
+        term = f"%{search.strip()}%"
+        query = query.filter(
+            or_(
+                Investment.product_name.ilike(term),
+                Investment.barcode.ilike(term),
+                Investment.category.ilike(term)
+            )
+        )
+    investments = query.order_by(Investment.product_name.asc()).all()
+    current_rate = get_current_bcv_rate(db, current_user.id)
+
+    items: List[POSCatalogItem] = []
+    seen = {}
+    for inv in investments:
+        key = (inv.product_name.strip().lower(), (inv.barcode or '').strip().lower())
+        if key not in seen:
+            cost_usd = inv.unit_cost_usd or 0.0
+            sugg_usd = round(cost_usd * 1.30, 2) if cost_usd > 0 else 1.0
+            sugg_ves = round(sugg_usd * current_rate, 2)
+            item = POSCatalogItem(
+                id=inv.id,
+                investment_id=inv.id,
+                product_name=inv.product_name,
+                barcode=inv.barcode,
+                category=inv.category or "General",
+                stock_available=inv.quantity,
+                available_stock=inv.quantity,
+                unit_cost_usd=cost_usd,
+                unit_cost_ves=round(cost_usd * current_rate, 2),
+                suggested_price_usd=sugg_usd,
+                suggested_price_ves=sugg_ves,
+                bcv_rate=current_rate
+            )
+            seen[key] = item
+            items.append(item)
+        else:
+            seen[key].stock_available += inv.quantity
+            if seen[key].available_stock is not None:
+                seen[key].available_stock += inv.quantity
+
+    return items
+
+@router.get("/pos/recent", response_model=List[SaleResponse])
+def get_pos_recent_sales(
+    limit: int = 20,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Obtener las ventas más recientes para la ventana modal de Últimas Ventas [F4]."""
+    sales = (
+        db.query(Sale)
+        .filter(Sale.user_id == current_user.id)
+        .order_by(Sale.created_at.desc())
+        .limit(limit)
+        .all()
+    )
+    return sales
+
 @router.post("/", response_model=SaleResponse, status_code=status.HTTP_201_CREATED)
 def create_sale(
     sale_in: SaleCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Registrar una nueva venta y calcular ganancias y márgenes."""
+    """Registrar una venta (multi-ítem POS o venta rápida) y calcular costos COGS y ganancias."""
     if sale_in.bcv_rate <= 0:
         raise HTTPException(status_code=400, detail="La tasa BCV debe ser mayor a 0")
-    if sale_in.quantity <= 0:
-        raise HTTPException(status_code=400, detail="La cantidad debe ser mayor a 0")
-    
-    unit_cost_usd = sale_in.unit_cost_usd or 0.0
 
-    # Vincular lote de inversión y descontar inventario automáticamente
-    target_investment = None
-    if sale_in.investment_id:
-        target_investment = (
-            db.query(Investment)
-            .filter(Investment.id == sale_in.investment_id, Investment.user_id == current_user.id)
-            .first()
-        )
-        if not target_investment:
-            raise HTTPException(status_code=404, detail="Lote de inversión no encontrado")
-    else:
-        # Búsqueda automática inteligente por nombre de producto con stock disponible (FIFO)
-        target_investment = (
-            db.query(Investment)
-            .filter(
-                Investment.user_id == current_user.id,
-                Investment.product_name.ilike(sale_in.product_name.strip()),
-                Investment.quantity > 0,
-            )
-            .order_by(Investment.created_at.asc())
-            .first()
-        )
-
-    if target_investment:
-        if target_investment.quantity < sale_in.quantity:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Stock insuficiente en el lote '{target_investment.product_name}'. Solo quedan {target_investment.quantity} unidades disponibles."
-            )
-        
-        # Descontar del inventario de inversión
-        target_investment.quantity -= sale_in.quantity
-        sale_in.investment_id = target_investment.id
-
-        # Asignar costo unitario de la inversión si no se suministró uno manual
-        if unit_cost_usd == 0.0:
-            unit_cost_usd = target_investment.unit_cost_usd
-
-    # Validar precios en USD y VES
-    if sale_in.unit_price_usd is not None and sale_in.unit_price_usd > 0:
-        unit_price_usd = round(sale_in.unit_price_usd, 2)
-        unit_price_ves = round(sale_in.unit_price_ves, 2) if sale_in.unit_price_ves else round(unit_price_usd * sale_in.bcv_rate, 2)
-    elif sale_in.unit_price_ves is not None and sale_in.unit_price_ves > 0:
-        unit_price_ves = round(sale_in.unit_price_ves, 2)
-        unit_price_usd = round(unit_price_ves / sale_in.bcv_rate, 2)
-    else:
-        raise HTTPException(status_code=400, detail="Debes especificar un precio de venta en USD o en VES mayor a 0")
-
-    # Cálculos financieros exactos
-    total_income_usd = round(unit_price_usd * sale_in.quantity, 2)
-    total_income_ves = round(unit_price_ves * sale_in.quantity, 2)
-    total_cost_usd = round(unit_cost_usd * sale_in.quantity, 2)
-    total_cost_ves = round(total_cost_usd * sale_in.bcv_rate, 2)
-    net_profit_usd = round(total_income_usd - total_cost_usd, 2)
-    net_profit_ves = round(total_income_ves - total_cost_ves, 2)
-    
-    if total_cost_usd > 0:
-        profit_margin_percent = round((net_profit_usd / total_cost_usd) * 100, 2)
-    else:
-        profit_margin_percent = 100.0
-
-    # Determinar categoría (heredada de la inversión o personalizada)
-    category = sale_in.category.strip() if (sale_in.category and sale_in.category.strip()) else None
-    if not category:
-        if target_investment and target_investment.category:
-            category = target_investment.category
-        else:
-            category = "General"
-
-    # Determinar estado de pago y saldo deudor
-    payment_status = (sale_in.payment_status or "paid").lower()
-    if payment_status not in ["paid", "partial", "pending"]:
-        payment_status = "paid"
-
-    if payment_status == "paid":
-        paid_amount_usd = total_income_usd
-        paid_amount_ves = total_income_ves
-        debt_amount_usd = 0.0
-        debt_amount_ves = 0.0
-    elif payment_status == "pending":
-        paid_amount_usd = 0.0
-        paid_amount_ves = 0.0
-        debt_amount_usd = total_income_usd
-        debt_amount_ves = total_income_ves
-    elif payment_status == "partial":
-        if sale_in.initial_payment_usd is not None and sale_in.initial_payment_usd > 0:
-            paid_amount_usd = round(min(total_income_usd, sale_in.initial_payment_usd), 2)
-            paid_amount_ves = round(paid_amount_usd * sale_in.bcv_rate, 2)
-        elif sale_in.initial_payment_ves is not None and sale_in.initial_payment_ves > 0:
-            paid_amount_ves = round(min(total_income_ves, sale_in.initial_payment_ves), 2)
-            paid_amount_usd = round(paid_amount_ves / sale_in.bcv_rate, 2)
-        else:
-            paid_amount_usd = 0.0
-            paid_amount_ves = 0.0
-        
-        debt_amount_usd = round(max(0.0, total_income_usd - paid_amount_usd), 2)
-        debt_amount_ves = round(max(0.0, total_income_ves - paid_amount_ves), 2)
-
-        if debt_amount_usd <= 0.01:
-            payment_status = "paid"
-            debt_amount_usd = 0.0
-            debt_amount_ves = 0.0
+    # Generar código correlativo de ticket único
+    ticket_code = sale_in.ticket_code
+    if not ticket_code or not ticket_code.strip():
+        count = db.query(Sale).filter(Sale.user_id == current_user.id).count() + 1
+        ticket_code = f"TKT-{count:06d}"
 
     # Vincular o registrar cliente automáticamente
     customer_id = sale_in.customer_id
@@ -208,24 +181,302 @@ def create_sale(
             db.flush()
             customer_id = new_cust.id
 
+    sale_items_to_create = []
+    
+    # -------------------------------------------------------------
+    # CASO 1: VENTA MULTI-ÍTEM (Terminal POS con carrito de compras)
+    # -------------------------------------------------------------
+    if sale_in.items and len(sale_in.items) > 0:
+        subtotal_usd = 0.0
+        subtotal_ves = 0.0
+        total_cost_usd = 0.0
+        total_cost_ves = 0.0
+        total_quantity = 0
+        product_names = []
+        primary_category = "General"
+
+        for it in sale_in.items:
+            qty = it.quantity or 1
+            if qty <= 0:
+                continue
+
+            target_investment = None
+            if it.investment_id:
+                target_investment = db.query(Investment).filter(
+                    Investment.id == it.investment_id,
+                    Investment.user_id == current_user.id
+                ).first()
+            elif it.barcode and it.barcode.strip():
+                target_investment = db.query(Investment).filter(
+                    Investment.user_id == current_user.id,
+                    Investment.barcode == it.barcode.strip(),
+                    Investment.quantity > 0
+                ).order_by(Investment.created_at.asc()).first()
+            
+            if not target_investment and it.product_name:
+                target_investment = db.query(Investment).filter(
+                    Investment.user_id == current_user.id,
+                    Investment.product_name.ilike(it.product_name.strip()),
+                    Investment.quantity > 0
+                ).order_by(Investment.created_at.asc()).first()
+
+            item_cost_usd = it.unit_cost_usd or 0.0
+            item_cat = it.category or "General"
+
+            if target_investment:
+                if target_investment.quantity < qty:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Stock insuficiente en el artículo '{target_investment.product_name}'. Solo quedan {target_investment.quantity} disponibles."
+                    )
+                target_investment.quantity -= qty
+                it.investment_id = target_investment.id
+                if item_cost_usd == 0.0:
+                    item_cost_usd = target_investment.unit_cost_usd
+                if target_investment.category:
+                    item_cat = target_investment.category
+
+            # Validar precios de venta del ítem
+            if it.unit_price_usd is not None and it.unit_price_usd > 0:
+                p_usd = round(it.unit_price_usd, 2)
+                p_ves = round(it.unit_price_ves or (p_usd * sale_in.bcv_rate), 2)
+            elif it.unit_price_ves is not None and it.unit_price_ves > 0:
+                p_ves = round(it.unit_price_ves, 2)
+                p_usd = round(p_ves / sale_in.bcv_rate, 2)
+            else:
+                p_usd = round(item_cost_usd * 1.30, 2) if item_cost_usd > 0 else 1.0
+                p_ves = round(p_usd * sale_in.bcv_rate, 2)
+
+            line_income_usd = round(p_usd * qty, 2)
+            line_income_ves = round(p_ves * qty, 2)
+            line_cost_usd = round(item_cost_usd * qty, 2)
+            line_cost_ves = round(line_cost_usd * sale_in.bcv_rate, 2)
+            line_profit_usd = round(line_income_usd - line_cost_usd, 2)
+            line_profit_ves = round(line_income_ves - line_cost_ves, 2)
+
+            subtotal_usd += line_income_usd
+            subtotal_ves += line_income_ves
+            total_cost_usd += line_cost_usd
+            total_cost_ves += line_cost_ves
+            total_quantity += qty
+            product_names.append(it.product_name.strip())
+            primary_category = item_cat
+
+            sale_items_to_create.append({
+                "investment_id": it.investment_id,
+                "product_name": it.product_name.strip(),
+                "barcode": it.barcode.strip() if it.barcode else None,
+                "category": item_cat,
+                "concepto_tipo": it.concepto_tipo or "producto",
+                "quantity": qty,
+                "unit_cost_usd": item_cost_usd,
+                "unit_cost_ves": round(item_cost_usd * sale_in.bcv_rate, 2),
+                "unit_price_usd": p_usd,
+                "unit_price_ves": p_ves,
+                "total_cost_usd": line_cost_usd,
+                "total_cost_ves": line_cost_ves,
+                "total_income_usd": line_income_usd,
+                "total_income_ves": line_income_ves,
+                "net_profit_usd": line_profit_usd,
+                "net_profit_ves": line_profit_ves,
+            })
+
+        discount_usd = round(sale_in.discount_usd or 0.0, 2)
+        discount_ves = round(sale_in.discount_ves or (discount_usd * sale_in.bcv_rate), 2)
+        total_income_usd = max(0.0, round(subtotal_usd - discount_usd, 2))
+        total_income_ves = max(0.0, round(subtotal_ves - discount_ves, 2))
+        net_profit_usd = round(total_income_usd - total_cost_usd, 2)
+        net_profit_ves = round(total_income_ves - total_cost_ves, 2)
+        margin_pct = round((net_profit_usd / total_cost_usd) * 100, 2) if total_cost_usd > 0 else 100.0
+
+        header_product_name = product_names[0] if len(product_names) == 1 else f"{product_names[0]} (+{len(product_names)-1} más)"
+        header_unit_cost = round(total_cost_usd / total_quantity, 2) if total_quantity > 0 else 0.0
+        header_unit_price = round(total_income_usd / total_quantity, 2) if total_quantity > 0 else 0.0
+
+    # -------------------------------------------------------------
+    # CASO 2: VENTA UNITARIA RÁPIDA (Retrocompatibilidad total)
+    # -------------------------------------------------------------
+    else:
+        if not sale_in.product_name or not sale_in.product_name.strip():
+            raise HTTPException(status_code=400, detail="Debe especificar al menos un producto o artículo")
+        qty = sale_in.quantity or 1
+        if qty <= 0:
+            raise HTTPException(status_code=400, detail="La cantidad debe ser mayor a 0")
+
+        unit_cost_usd = sale_in.unit_cost_usd or 0.0
+        target_investment = None
+        if sale_in.investment_id:
+            target_investment = db.query(Investment).filter(
+                Investment.id == sale_in.investment_id,
+                Investment.user_id == current_user.id
+            ).first()
+            if not target_investment:
+                raise HTTPException(status_code=404, detail="Lote de inversión no encontrado")
+        else:
+            target_investment = db.query(Investment).filter(
+                Investment.user_id == current_user.id,
+                Investment.product_name.ilike(sale_in.product_name.strip()),
+                Investment.quantity > 0
+            ).order_by(Investment.created_at.asc()).first()
+
+        if target_investment:
+            if target_investment.quantity < qty:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Stock insuficiente en '{target_investment.product_name}'. Solo quedan {target_investment.quantity} disponibles."
+                )
+            target_investment.quantity -= qty
+            sale_in.investment_id = target_investment.id
+            if unit_cost_usd == 0.0:
+                unit_cost_usd = target_investment.unit_cost_usd
+
+        if sale_in.unit_price_usd is not None and sale_in.unit_price_usd > 0:
+            unit_price_usd = round(sale_in.unit_price_usd, 2)
+            unit_price_ves = round(sale_in.unit_price_ves or (unit_price_usd * sale_in.bcv_rate), 2)
+        elif sale_in.unit_price_ves is not None and sale_in.unit_price_ves > 0:
+            unit_price_ves = round(sale_in.unit_price_ves, 2)
+            unit_price_usd = round(unit_price_ves / sale_in.bcv_rate, 2)
+        else:
+            raise HTTPException(status_code=400, detail="Debe especificar un precio de venta mayor a 0")
+
+        subtotal_usd = round(unit_price_usd * qty, 2)
+        subtotal_ves = round(unit_price_ves * qty, 2)
+        discount_usd = round(sale_in.discount_usd or 0.0, 2)
+        discount_ves = round(sale_in.discount_ves or (discount_usd * sale_in.bcv_rate), 2)
+        total_income_usd = max(0.0, round(subtotal_usd - discount_usd, 2))
+        total_income_ves = max(0.0, round(subtotal_ves - discount_ves, 2))
+        total_cost_usd = round(unit_cost_usd * qty, 2)
+        total_cost_ves = round(total_cost_usd * sale_in.bcv_rate, 2)
+        net_profit_usd = round(total_income_usd - total_cost_usd, 2)
+        net_profit_ves = round(total_income_ves - total_cost_ves, 2)
+        margin_pct = round((net_profit_usd / total_cost_usd) * 100, 2) if total_cost_usd > 0 else 100.0
+
+        header_product_name = sale_in.product_name.strip()
+        primary_category = (sale_in.category or "General").strip() or "General"
+        header_unit_cost = unit_cost_usd
+        header_unit_price = unit_price_usd
+        total_quantity = qty
+
+        sale_items_to_create.append({
+            "investment_id": sale_in.investment_id,
+            "product_name": header_product_name,
+            "barcode": None,
+            "category": primary_category,
+            "concepto_tipo": "producto",
+            "quantity": qty,
+            "unit_cost_usd": unit_cost_usd,
+            "unit_cost_ves": round(unit_cost_usd * sale_in.bcv_rate, 2),
+            "unit_price_usd": unit_price_usd,
+            "unit_price_ves": unit_price_ves,
+            "total_cost_usd": total_cost_usd,
+            "total_cost_ves": total_cost_ves,
+            "total_income_usd": total_income_usd,
+            "total_income_ves": total_income_ves,
+            "net_profit_usd": net_profit_usd,
+            "net_profit_ves": net_profit_ves,
+        })
+
+    # Gestión de Pagos (Soporte pagos mixtos / abono inicial / venta a crédito)
+    payment_status = (sale_in.payment_status or "paid").lower()
+    payments_to_add = []
+
+    if sale_in.payments and len(sale_in.payments) > 0:
+        paid_amount_usd = 0.0
+        paid_amount_ves = 0.0
+        for p in sale_in.payments:
+            p_usd = p.amount_usd or 0.0
+            p_ves = p.amount_ves or 0.0
+            if p_usd <= 0 and p_ves > 0:
+                p_usd = round(p_ves / sale_in.bcv_rate, 2)
+            elif p_ves <= 0 and p_usd > 0:
+                p_ves = round(p_usd * sale_in.bcv_rate, 2)
+            if p_usd > 0:
+                paid_amount_usd += p_usd
+                paid_amount_ves += p_ves
+                payments_to_add.append({
+                    "amount_usd": round(p_usd, 2),
+                    "amount_ves": round(p_ves, 2),
+                    "payment_method": p.payment_method or "Pago Móvil",
+                    "notes": p.notes or "Pago en POS",
+                })
+        paid_amount_usd = round(paid_amount_usd, 2)
+        paid_amount_ves = round(paid_amount_ves, 2)
+        debt_amount_usd = round(max(0.0, total_income_usd - paid_amount_usd), 2)
+        debt_amount_ves = round(max(0.0, total_income_ves - paid_amount_ves), 2)
+        if debt_amount_usd <= 0.01:
+            payment_status = "paid"
+            debt_amount_usd = 0.0
+            debt_amount_ves = 0.0
+        elif paid_amount_usd > 0:
+            payment_status = "partial"
+        else:
+            payment_status = "pending"
+    else:
+        # Modo estándar single payment
+        if payment_status == "paid":
+            paid_amount_usd = total_income_usd
+            paid_amount_ves = total_income_ves
+            debt_amount_usd = 0.0
+            debt_amount_ves = 0.0
+            payments_to_add.append({
+                "amount_usd": paid_amount_usd,
+                "amount_ves": paid_amount_ves,
+                "payment_method": sale_in.payment_method or "Pago Móvil",
+                "notes": "Pago al contado",
+            })
+        elif payment_status == "pending":
+            paid_amount_usd = 0.0
+            paid_amount_ves = 0.0
+            debt_amount_usd = total_income_usd
+            debt_amount_ves = total_income_ves
+        elif payment_status == "partial":
+            if sale_in.initial_payment_usd is not None and sale_in.initial_payment_usd > 0:
+                paid_amount_usd = round(min(total_income_usd, sale_in.initial_payment_usd), 2)
+                paid_amount_ves = round(paid_amount_usd * sale_in.bcv_rate, 2)
+            elif sale_in.initial_payment_ves is not None and sale_in.initial_payment_ves > 0:
+                paid_amount_ves = round(min(total_income_ves, sale_in.initial_payment_ves), 2)
+                paid_amount_usd = round(paid_amount_ves / sale_in.bcv_rate, 2)
+            else:
+                paid_amount_usd = 0.0
+                paid_amount_ves = 0.0
+
+            debt_amount_usd = round(max(0.0, total_income_usd - paid_amount_usd), 2)
+            debt_amount_ves = round(max(0.0, total_income_ves - paid_amount_ves), 2)
+            if debt_amount_usd <= 0.01:
+                payment_status = "paid"
+                debt_amount_usd = 0.0
+                debt_amount_ves = 0.0
+            if paid_amount_usd > 0:
+                payments_to_add.append({
+                    "amount_usd": paid_amount_usd,
+                    "amount_ves": paid_amount_ves,
+                    "payment_method": sale_in.payment_method or "Pago Móvil",
+                    "notes": "Abono inicial",
+                })
+
     new_sale = Sale(
         user_id=current_user.id,
-        investment_id=sale_in.investment_id,
+        ticket_code=ticket_code,
+        investment_id=sale_in.investment_id if len(sale_items_to_create) == 1 else None,
         customer_id=customer_id,
-        product_name=sale_in.product_name,
-        category=category,
-        quantity=sale_in.quantity,
-        unit_cost_usd=unit_cost_usd,
-        unit_price_usd=unit_price_usd,
-        unit_price_ves=unit_price_ves,
+        product_name=header_product_name,
+        category=primary_category,
+        quantity=total_quantity,
+        unit_cost_usd=header_unit_cost,
+        unit_price_usd=header_unit_price,
+        unit_price_ves=round(header_unit_price * sale_in.bcv_rate, 2),
         bcv_rate=sale_in.bcv_rate,
+        subtotal_usd=subtotal_usd,
+        subtotal_ves=subtotal_ves,
+        discount_usd=discount_usd,
+        discount_ves=discount_ves,
         total_income_usd=total_income_usd,
         total_income_ves=total_income_ves,
         total_cost_usd=total_cost_usd,
         total_cost_ves=total_cost_ves,
         net_profit_usd=net_profit_usd,
         net_profit_ves=net_profit_ves,
-        profit_margin_percent=profit_margin_percent,
+        profit_margin_percent=margin_pct,
         payment_method=sale_in.payment_method or "Pago Móvil",
         payment_status=payment_status,
         paid_amount_usd=paid_amount_usd,
@@ -237,21 +488,43 @@ def create_sale(
         customer_phone=customer_phone,
         notes=sale_in.notes
     )
-
     db.add(new_sale)
     db.flush()
 
-    # Si hubo desembolso inicial, registrar comprobante de abono / pago
-    if paid_amount_usd > 0:
-        initial_payment = SalePayment(
+    # Añadir ítems hijos
+    for it_dict in sale_items_to_create:
+        s_item = SaleItem(
             sale_id=new_sale.id,
-            amount_usd=paid_amount_usd,
-            amount_ves=paid_amount_ves,
-            bcv_rate=sale_in.bcv_rate,
-            payment_method=sale_in.payment_method or "Pago Móvil",
-            notes="Pago al contado" if payment_status == "paid" else "Abono inicial",
+            investment_id=it_dict["investment_id"],
+            product_name=it_dict["product_name"],
+            barcode=it_dict["barcode"],
+            category=it_dict["category"],
+            concepto_tipo=it_dict["concepto_tipo"],
+            quantity=it_dict["quantity"],
+            unit_cost_usd=it_dict["unit_cost_usd"],
+            unit_cost_ves=it_dict["unit_cost_ves"],
+            unit_price_usd=it_dict["unit_price_usd"],
+            unit_price_ves=it_dict["unit_price_ves"],
+            total_cost_usd=it_dict["total_cost_usd"],
+            total_cost_ves=it_dict["total_cost_ves"],
+            total_income_usd=it_dict["total_income_usd"],
+            total_income_ves=it_dict["total_income_ves"],
+            net_profit_usd=it_dict["net_profit_usd"],
+            net_profit_ves=it_dict["net_profit_ves"],
         )
-        db.add(initial_payment)
+        db.add(s_item)
+
+    # Añadir pagos registrados
+    for p_dict in payments_to_add:
+        payment_rec = SalePayment(
+            sale_id=new_sale.id,
+            amount_usd=p_dict["amount_usd"],
+            amount_ves=p_dict["amount_ves"],
+            bcv_rate=sale_in.bcv_rate,
+            payment_method=p_dict["payment_method"],
+            notes=p_dict["notes"]
+        )
+        db.add(payment_rec)
 
     db.commit()
     db.refresh(new_sale)
@@ -879,8 +1152,14 @@ def delete_sale(
     if not sale:
         raise HTTPException(status_code=404, detail="Venta no encontrada")
 
-    # Restituir stock al lote de inversión
-    if sale.investment_id:
+    # Restituir stock al lote de inversión (multi-ítem o lote individual)
+    if sale.items and len(sale.items) > 0:
+        for it in sale.items:
+            if it.investment_id:
+                inv = db.query(Investment).filter(Investment.id == it.investment_id).first()
+                if inv:
+                    inv.quantity += it.quantity
+    elif sale.investment_id:
         inv = db.query(Investment).filter(Investment.id == sale.investment_id).first()
         if inv:
             inv.quantity += sale.quantity

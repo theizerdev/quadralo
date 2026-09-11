@@ -102,6 +102,7 @@ def create_investment(
     new_investment = Investment(
         user_id=current_user.id,
         product_name=investment_in.product_name.strip(),
+        barcode=investment_in.barcode.strip() if investment_in.barcode else None,
         category=cat_clean,
         amount_ves=investment_in.amount_ves,
         bcv_rate=investment_in.bcv_rate,
@@ -250,6 +251,8 @@ def update_investment(
     # Actualizar campos proporcionados
     if investment_in.product_name is not None:
         investment.product_name = investment_in.product_name.strip()
+    if investment_in.barcode is not None:
+        investment.barcode = investment_in.barcode.strip() if investment_in.barcode.strip() else None
     if investment_in.category is not None:
         cat_clean = investment_in.category.strip()
         investment.category = cat_clean if cat_clean else "General"

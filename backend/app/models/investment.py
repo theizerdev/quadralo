@@ -14,6 +14,7 @@ class Investment(Base):
     user_id = Column(String(36), ForeignKey("users.id"), nullable=False, index=True)
     
     product_name = Column(String(255), nullable=False)
+    barcode = Column(String(100), nullable=True, index=True)
     category = Column(String(100), nullable=False, default="General", index=True)
     amount_ves = Column(Float, nullable=False)          # Inversión en Bolívares
     bcv_rate = Column(Float, nullable=False)            # Tasa BCV usada en la compra
