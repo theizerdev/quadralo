@@ -129,9 +129,9 @@ echo   1. Ejecutar start.bat
 echo   2. Ejecutar "npm run dev"
 echo   3. Ejecutar "python dev.py"
 echo.
-echo   * Frontend disponible en: http://localhost:3000
-echo   * Backend disponible en:  http://127.0.0.1:8000
-echo   * Documentación API en:   http://127.0.0.1:8000/docs
+echo   * Frontend disponible en: http://localhost:3001
+echo   * Backend disponible en:  http://127.0.0.1:8001
+echo   * Documentación API en:   http://127.0.0.1:8001/docs
 echo ================================================================
 echo.
 pause
